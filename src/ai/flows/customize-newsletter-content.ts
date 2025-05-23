@@ -1,3 +1,4 @@
+
 // src/ai/flows/customize-newsletter-content.ts
 'use server';
 
@@ -58,7 +59,7 @@ export type CustomizeNewsletterOutput = z.infer<typeof CustomizeNewsletterOutput
 
 const summarizeNewsTool = ai.defineTool({
     name: 'summarizeNews',
-    description: 'Summarizes and prioritizes running news stories based on relevance to the user.',
+    description: 'Summarizes and prioritizes running news stories based on relevance to the user. Provides top 5 stories.',
     inputSchema: z.object({
       articles: z
         .array(
@@ -68,6 +69,7 @@ const summarizeNewsTool = ai.defineTool({
             content: z.string().describe('The full content of the article.'),
           })
         )
+        .min(1) // Ensure there's at least one article to process
         .describe('An array of running-related news articles.'),
       runningLevel: z.string().describe('The running level of the user.'),
       trainingPlanType: z.string().describe('The type of training plan the user is following.'),
@@ -80,13 +82,13 @@ const summarizeNewsTool = ai.defineTool({
         url: z.string().url().describe('The URL of the article.'),
         priority: z.number().int().min(1).max(5).describe('The priority of the article (1 is highest).'),
       })
-    ),
+    ).max(5), // Ensure the tool handler returns at most 5 stories
     async handler(input) {
-      // Implement the news summarization and prioritization logic here
-      // This is a placeholder implementation
+      // Placeholder implementation: This would ideally call another LLM for actual summarization and intelligent prioritization.
+      // For now, it truncates to 5, assigns basic summaries and priorities.
       return input.articles.slice(0, 5).map((article, index) => ({
         title: article.title,
-        summary: `Summary of ${article.title}`,
+        summary: `Summary of "${article.title}": ${article.content.substring(0, 100)}...`, // Basic summary
         url: article.url,
         priority: index + 1,
       }));
@@ -99,10 +101,19 @@ const generateGreetingTool = ai.defineTool({
   inputSchema: z.object({
     userName: z.string().describe('The name of the user.'),
   }),
-  outputSchema: z.string(),
+  outputSchema: z.string().describe('The personalized greeting string.'),
   async handler(input) {
-    // This is a placeholder implementation
-    return `Hey, ${input.userName}! Ready for your run?`;
+    // Placeholder implementation for generating a greeting.
+    // In a real scenario, this might call another LLM or use a template.
+    const puns = [
+      "Ready to hit your stride?",
+      "Time to make every mile count!",
+      "Hope your run is unbe-leaf-ably good!",
+      "Don't be a snail, let's hit the trail!",
+      "May your pace be steady and your thoughts be speedy!"
+    ];
+    const randomPun = puns[Math.floor(Math.random() * puns.length)];
+    return `Hey, ${input.userName}! ${randomPun}`;
   },
 });
 
@@ -117,24 +128,28 @@ const prompt = ai.definePrompt({
   tools: [summarizeNewsTool, generateGreetingTool],
   prompt: `You are a personalized newsletter generator for runners. You will generate a newsletter based on the user's preferences, training plan, and local weather.
 
-  First, generate a personalized greeting using the generateWorkoutPunGreeting tool.
-  Then, provide the local weather information.
-  Next, display the workout scheduled for the day.
-  Finally, summarize and prioritize the top 5 news stories related to running, using the summarizeNews tool. Ensure the news is relevant to the user's running level, training plan type, and race distance.
+  Your response MUST be in JSON format, adhering to the defined output schema.
 
-  If the user's training plan has ended, include a planEndNotification message, encouraging them to update their profile with a new plan.
+  Tasks to perform:
+  1. Generate a personalized greeting: Use the 'generateWorkoutPunGreeting' tool. The user's name is {{{userName}}}.
+  2. Provide local weather: The weather information is directly available as '{{{weather}}}'. Include this in the output.
+  3. Display scheduled workout: The workout for today is '{{{workout}}}'. Include this in the output.
+  4. Summarize and prioritize news: Use the 'summarizeNews' tool to get the top 5 running news stories.
+     - The articles to process are available in the 'newsStories' input field.
+     - Consider the user's runningLevel: '{{{runningLevel}}}', trainingPlanType: '{{{trainingPlanType}}}', and raceDistance: '{{{raceDistance}}}' for relevance when the tool processes the news.
+  5. Plan end notification: If the user's training plan has ended (this information might be implicitly part of the workout or overall context, if not directly passed, use your best judgment or await explicit instruction if a specific "plan_ended_flag" becomes available), include a 'planEndNotification' message encouraging them to update their profile. If no plan end is indicated, omit this field or set it to null/empty if the schema requires.
 
-  Here are the user details:
+  User details available for your context and for tool usage:
   - Name: {{{userName}}}
   - Location: {{{location}}}
   - Running Level: {{{runningLevel}}}
   - Training Plan Type: {{{trainingPlanType}}}
   - Race Distance: {{{raceDistance}}}
-  - Workout: {{{workout}}}
-  - Weather: {{{weather}}}
-  - News Stories: {{newsStories}}}
+  - Today's Workout: {{{workout}}}
+  - Current Weather: {{{weather}}}
+  - News Stories (for the summarizeNewsTool): {{{newsStories}}}
 
-  Output the greeting, weather, workout, topStories, and planEndNotification in JSON format. The topStories should be an array of summarized and prioritized news stories.
+  Ensure the final output strictly follows the JSON schema for 'CustomizeNewsletterOutputSchema'.
 `,
 });
 
@@ -144,24 +159,17 @@ const customizeNewsletterFlow = ai.defineFlow(
     inputSchema: CustomizeNewsletterInputSchema,
     outputSchema: CustomizeNewsletterOutputSchema,
   },
-  async input => {
-    const greeting = await generateGreetingTool({
-      userName: input.userName,
-    });
-
-    const topStories = await summarizeNewsTool({
-      articles: input.newsStories,
-      runningLevel: input.runningLevel,
-      trainingPlanType: input.trainingPlanType,
-      raceDistance: input.raceDistance,
-    });
-
-    const {output} = await prompt({
-      ...input,
-      greeting: greeting,
-      topStories: topStories,
-    });
-    return output!;
+  async (input: CustomizeNewsletterInput) => {
+    // The LLM is instructed by the prompt to use 'generateGreetingTool' and 'summarizeNewsTool'.
+    // It will extract necessary parameters for these tools from the 'input' provided to this flow.
+    // The final output structure, including 'greeting' and 'topStories', will be generated by the LLM
+    // according to the CustomizeNewsletterOutputSchema, after utilizing the tools.
+    const {output} = await prompt(input);
+    
+    if (!output) {
+      throw new Error('The customizeNewsletterFlow did not produce an output.');
+    }
+    return output;
   }
 );
 
