@@ -71,7 +71,7 @@ export type CustomizeNewsletterInput = z.infer<typeof CustomizeNewsletterInputSc
 
 const CustomizeNewsletterOutputSchema = z.object({
   greeting: z.string().describe('A friendly greeting with a running-related pun.'),
-  weather: z.string().describe("A user-friendly summary of the day's local weather forecast, including a recommendation for the best time to run based on the provided hourly data. If weather data is unavailable or an error occurred, this should state so clearly."),
+  weather: z.string().describe("A user-friendly summary of the day's local weather forecast, including a recommendation for the best time to run based on the provided hourly data. If weather data is unavailable or an error occurred, this should state so clearly and include the specific error message."),
   workout: z.string().describe('The workout scheduled for the user for the current day.'),
   topStories: z
     .array(
@@ -123,9 +123,10 @@ const summarizeNewsTool = ai.defineTool({
       if (!input.articles || input.articles.length === 0) {
         return [];
       }
+      // Placeholder summarization and prioritization - LLM will do the real work via prompt
       return input.articles.slice(0, 5).map((article, index) => ({
         title: article.title,
-        summary: `Personalized summary for ${input.runningLevel} runner targeting ${input.raceDistance}: ${article.content.substring(0, Math.min(150, article.content.length / 2))}... (Based on your ${input.trainingPlanType} plan).`,
+        summary: `Summary for ${input.runningLevel} runner targeting ${input.raceDistance}: ${article.content.substring(0, Math.min(100, article.content.length))}...`,
         url: article.url,
         priority: index + 1,
       }));
@@ -140,13 +141,11 @@ const generateGreetingTool = ai.defineTool({
   }),
   outputSchema: z.string().describe('The personalized greeting string, including a pun.'),
   async handler(input) {
+    // Placeholder pun generation - LLM will do the real work via prompt
     const puns = [
       `Ready to hit the ground running, ${input.userName}? Hope your day is a marathon, not a sprint!`,
       `Time to lace up, ${input.userName}! May your run be swift and your coffee strong.`,
       `${input.userName}, let's make today legen-dairy with a great run!`,
-      `Don't stop when you're tired, ${input.userName}, stop when you're done! Go get 'em!`,
-      `Hey, ${input.userName}! Remember, every mile is a new adventure. Enjoy your run!`,
-      `What's up, ${input.userName}? Ready to jog your memory on how awesome running is?`
     ];
     return puns[Math.floor(Math.random() * puns.length)] || `Hello ${input.userName}, have a great run!`;
   },
@@ -169,9 +168,9 @@ const prompt = ai.definePrompt({
   1. Generate a personalized greeting: Use the 'generateWorkoutPunGreeting' tool. The user's name is {{{userName}}}.
   
   2. Provide local weather forecast and running recommendation:
-     - The input '{{{weather}}}' contains structured daily forecast data for {{{location}}} or an error object.
-     - If '{{{weather.error}}}' exists, your output for the weather section should clearly state: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}".
-     - Otherwise (if '{{{weather.hourly}}}' exists):
+     - The input 'weather' ({{{weather}}}) contains structured daily forecast data for {{{location}}} or an error object.
+     - If '{{{weather.error}}}' exists, your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present in the input 'weather' object.
+     - Otherwise (if '{{{weather.hourly}}}' exists and '{{{weather.error}}}' does not):
        - Create a user-friendly summary of the day's forecast based on '{{{weather.overallDescription}}}', '{{{weather.tempMin}}}', '{{{weather.tempMax}}}', '{{{weather.sunrise}}}', '{{{weather.sunset}}}', '{{{weather.humidityAvg}}}'. Mention temperatures with the user's preferred unit ('{{{weatherUnit}}}').
        - Analyze the '{{{weather.hourly}}}' data (time, temp, feelsLike, description, pop, windSpeed) to recommend the BEST time of day to run. 
        - Your recommendation should be specific (e.g., "around 7 AM" or "between 4 PM and 6 PM").
@@ -214,14 +213,18 @@ const customizeNewsletterFlow = ai.defineFlow(
     
     if (!output) {
       // Fallback in case the LLM fails to produce an output matching the schema
-      // This is a basic fallback, more sophisticated error handling might be needed
       console.error("AI prompt did not produce expected output for input:", JSON.stringify(input, null, 2));
       
       // Construct a minimal valid output
       const fallbackGreeting = `Hello ${input.userName}, have a great run!`;
-      const fallbackWeather = (input.weather as {error: string})?.error 
-        ? `Weather forecast for ${input.location} is currently unavailable: ${(input.weather as {error: string}).error}`
-        : `Weather information for ${input.location} is currently being processed.`;
+      
+      let fallbackWeather: string;
+      if (typeof input.weather === 'object' && input.weather && 'error' in input.weather && typeof input.weather.error === 'string') {
+        fallbackWeather = `Weather forecast for ${input.location} is currently unavailable: ${input.weather.error}`;
+      } else {
+        fallbackWeather = `Weather information for ${input.location} is currently being processed.`;
+      }
+      
       const fallbackWorkout = input.workout || "No workout information available.";
       
       return {
@@ -235,3 +238,4 @@ const customizeNewsletterFlow = ai.defineFlow(
     return output;
   }
 );
+

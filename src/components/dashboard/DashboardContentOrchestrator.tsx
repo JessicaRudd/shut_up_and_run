@@ -38,7 +38,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     async function fetchNewsletterData() {
       setLoading(true);
       setError(null);
-      setWeatherErrorForAI(null);
+      setWeatherErrorForAI(null); // Reset at the beginning
       try {
         const todaysWorkout = getTodaysWorkout(userProfile);
         
@@ -47,12 +47,17 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
 
         let weatherInputForAI: CustomizeNewsletterInput['weather'];
 
-        if ('error' in weatherResult) {
+        if ('error' in weatherResult) { // This means weatherResult IS { error: string } directly from service
           console.warn("Weather service returned an error:", weatherResult.error);
           weatherInputForAI = { error: weatherResult.error };
           setWeatherErrorForAI(weatherResult.error); 
-        } else {
+        } else { // This means weatherResult IS DailyForecastData
           weatherInputForAI = weatherResult as DailyForecastData;
+          if (weatherResult.error) { // Check for internal error within DailyForecastData object
+            console.warn("Weather data processed with an internal error:", weatherResult.error);
+            // weatherInputForAI is already weatherResult which contains the .error
+            setWeatherErrorForAI(weatherResult.error); // Ensure this is set for local fallback display too
+          }
         }
         
         // Derive raceDistance from trainingPlan for AI context
@@ -91,8 +96,9 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
         } else {
           errorMessage += "An unknown error occurred."
         }
-        if (weatherErrorForAI && errorMessage.includes("AI")) {
-            setError(`Failed to process weather data: ${weatherErrorForAI}. ${errorMessage}`);
+        // Prioritize showing a weather-specific error if it's available and AI processing failed
+        if (weatherErrorForAI && (err.message?.toLowerCase().includes('ai') || err.message?.toLowerCase().includes('flow'))) {
+            setError(`Failed to process weather data: ${weatherErrorForAI}. Details: ${errorMessage}`);
         } else {
             setError(errorMessage);
         }
@@ -103,7 +109,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
 
     fetchNewsletterData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userProfile]); // Removed weatherErrorForAI from dep array as it caused loops. It's set within effect.
+  }, [userProfile]);
 
   if (loading) {
     return (
