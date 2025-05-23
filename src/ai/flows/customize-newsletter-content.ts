@@ -120,13 +120,20 @@ const summarizeNewsTool = ai.defineTool({
         priority: z.number().int().min(1).max(5).describe('The priority of the article (1 is highest).'),
       })
     ).max(5),
-    async handler(input) { // This handler is a placeholder. The LLM will use the tool description to generate the output.
+    async handler(input) { 
       if (!input.articles || input.articles.length === 0) {
         return [];
       }
-      return input.articles.slice(0, 5).map((article, index) => ({
+      // Enhanced placeholder handler
+      const relevantArticles = input.articles.filter(article => 
+        article.title.toLowerCase().includes(input.raceDistance.toLowerCase()) || 
+        article.content.toLowerCase().includes(input.runningLevel.toLowerCase())
+      );
+      const articlesToSummarize = relevantArticles.length > 0 ? relevantArticles : input.articles;
+
+      return articlesToSummarize.slice(0, 5).map((article, index) => ({
         title: article.title,
-        summary: `Summarized content for ${article.title.substring(0,30)}... based on user profile.`,
+        summary: `Summary of "${article.title.substring(0,30)}..." considering ${input.runningLevel} level for ${input.raceDistance}.`,
         url: article.url,
         priority: index + 1,
       }));
@@ -140,8 +147,16 @@ const generateGreetingTool = ai.defineTool({
     userName: z.string().describe('The name of the user.'),
   }),
   outputSchema: z.string().describe('The personalized greeting string, including a pun.'),
-  async handler(input) { // This handler is a placeholder. The LLM will use the tool description to generate the output.
-    return `Hey ${input.userName}, ready to hit the pavement? Don't be a sub-scriber, be a run-scriber!`;
+  async handler(input) { 
+    const puns = [
+      "ready to hit the pavement?",
+      "time to make some tracks!",
+      "set for a new personal best today?",
+      "going the distance, one step at a time!",
+      "chasing that runner's high?"
+    ];
+    const randomPun = puns[Math.floor(Math.random() * puns.length)];
+    return `Hey ${input.userName}, ${randomPun}`;
   },
 });
 
@@ -239,12 +254,17 @@ const customizeNewsletterFlow = ai.defineFlow(
       let fallbackWeather: string;
       let fallbackDressSuggestion = "Clothing recommendations are currently unavailable.";
 
-      if (typeof input.weather === 'object' && input.weather && 'error' in input.weather && typeof input.weather.error === 'string') {
+      // Check if input.weather itself is an error object or DailyForecastData with an error property
+      const weatherHasError = typeof input.weather === 'object' && input.weather && 'error' in input.weather && typeof input.weather.error === 'string' && input.weather.error.length > 0;
+
+      if (weatherHasError) {
         fallbackWeather = `Weather forecast for ${input.location} is currently unavailable: ${input.weather.error}`;
-        // Dress suggestion also reflects weather error
         fallbackDressSuggestion = `Clothing recommendations are unavailable because the weather forecast could not be retrieved: ${input.weather.error}`;
       } else {
-        fallbackWeather = `Weather information for ${input.location} is currently being processed.`;
+        // Weather data was good, but AI failed.
+        fallbackWeather = `Could not generate weather summary for ${input.location} at this time. Please try again later.`;
+        // Dress suggestion also reflects AI failure with good weather data
+        fallbackDressSuggestion = `Could not generate clothing recommendations for ${input.location} at this time. Please try again later.`;
       }
       
       const fallbackWorkout = input.workout || "No workout information available.";
