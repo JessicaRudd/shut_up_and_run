@@ -2,7 +2,7 @@
 "use client";
 
 import type { UserProfile, RunningLevel, TrainingPlan, WeatherUnit, NewsletterDelivery } from "@/lib/types";
-import { DEFAULT_USER_PROFILE } from "@/lib/constants";
+import { DEFAULT_USER_PROFILE, RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS } from "@/lib/constants";
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
 interface UserProfileContextType {
@@ -21,8 +21,8 @@ const checkProfileCompleteness = (profile: UserProfile | null): boolean => {
   return !!(
     profile.name &&
     profile.location &&
-    profile.runningLevel && // Will be "beginner", "intermediate", or "advanced"
-    profile.trainingPlan && // Will be "5k", "10k", etc.
+    profile.runningLevel && // This will be false if profile.runningLevel is ""
+    profile.trainingPlan && // This will be false if profile.trainingPlan is ""
     profile.weatherUnit &&
     profile.newsletterDelivery
   );
@@ -35,46 +35,69 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   const [isProfileComplete, setIsProfileComplete] = useState(false);
 
   useEffect(() => {
-    let loadedProfile = DEFAULT_USER_PROFILE;
+    let profileToSet = DEFAULT_USER_PROFILE;
     try {
-      const storedProfile = localStorage.getItem("userProfile");
-      if (storedProfile) {
-        const parsedProfile = JSON.parse(storedProfile) as Partial<UserProfile>; // Partial to handle old profiles
-        // Ensure all fields from UserProfile type exist, defaulting if necessary
-        loadedProfile = {
-          id: parsedProfile.id || DEFAULT_USER_PROFILE.id,
-          name: parsedProfile.name || DEFAULT_USER_PROFILE.name,
-          location: parsedProfile.location || DEFAULT_USER_PROFILE.location,
-          runningLevel: (parsedProfile.runningLevel && RUNNING_LEVELS.find(rl => rl.value === parsedProfile.runningLevel)) 
-                          ? parsedProfile.runningLevel 
+      const storedProfileJson = localStorage.getItem("userProfile");
+      if (storedProfileJson) {
+        const storedProfile = JSON.parse(storedProfileJson) as Partial<UserProfile>;
+        
+        profileToSet = {
+          ...DEFAULT_USER_PROFILE, // Start with defaults
+          ...storedProfile,        // Override with stored values that are present
+          
+          // Explicitly validate/coerce enums that might be invalid from old storage or missing
+          runningLevel: RUNNING_LEVELS.find(rl => rl.value === storedProfile.runningLevel)
+                          ? storedProfile.runningLevel! 
                           : DEFAULT_USER_PROFILE.runningLevel,
-          trainingPlan: (parsedProfile.trainingPlan && TRAINING_PLANS.find(tp => tp.value === parsedProfile.trainingPlan))
-                          ? parsedProfile.trainingPlan
+          trainingPlan: TRAINING_PLANS.find(tp => tp.value === storedProfile.trainingPlan)
+                          ? storedProfile.trainingPlan!
                           : DEFAULT_USER_PROFILE.trainingPlan,
-          planStartDate: parsedProfile.planStartDate,
-          raceDate: parsedProfile.raceDate,
-          weatherUnit: parsedProfile.weatherUnit || DEFAULT_USER_PROFILE.weatherUnit,
-          newsletterDelivery: parsedProfile.newsletterDelivery || DEFAULT_USER_PROFILE.newsletterDelivery,
+          weatherUnit: WEATHER_UNITS.find(wu => wu.value === storedProfile.weatherUnit)
+                          ? storedProfile.weatherUnit!
+                          : DEFAULT_USER_PROFILE.weatherUnit,
+          newsletterDelivery: NEWSLETTER_DELIVERY_OPTIONS.find(nd => nd.value === storedProfile.newsletterDelivery)
+                          ? storedProfile.newsletterDelivery!
+                          : DEFAULT_USER_PROFILE.newsletterDelivery,
+          // Ensure id is preserved from storedProfile if it exists, otherwise from DEFAULT_USER_PROFILE
+          id: storedProfile.id || DEFAULT_USER_PROFILE.id,
         };
       }
     } catch (error) {
       console.error("Failed to load user profile from localStorage", error);
-      // loadedProfile remains DEFAULT_USER_PROFILE
+      // profileToSet remains DEFAULT_USER_PROFILE
     }
     
-    setUserProfile(loadedProfile);
-    setIsProfileComplete(checkProfileCompleteness(loadedProfile));
+    setUserProfile(profileToSet);
+    setIsProfileComplete(checkProfileCompleteness(profileToSet));
     setLoading(false);
   }, []);
 
-  const setUserProfileState = (profile: UserProfile) => {
-    const validatedProfile: UserProfile = {
-        ...DEFAULT_USER_PROFILE, // Base defaults
-        ...profile, // Apply incoming profile
-        id: profile.id || userProfile.id || DEFAULT_USER_PROFILE.id, // Preserve ID if possible
-        runningLevel: profile.runningLevel || DEFAULT_USER_PROFILE.runningLevel,
-        trainingPlan: profile.trainingPlan || DEFAULT_USER_PROFILE.trainingPlan,
+  const setUserProfileState = (profileChanges: Partial<UserProfile>) => {
+    // Merge changes with current profile, then validate and save
+    const newProfileCandidate = {
+      ...userProfile, // Current state as base
+      ...profileChanges // Apply incoming changes
     };
+
+    const validatedProfile: UserProfile = {
+      ...DEFAULT_USER_PROFILE, // Base defaults for any missing fields
+      ...newProfileCandidate,  // Merged profile
+      // Re-validate enums and ensure ID is correctly handled
+      id: newProfileCandidate.id || DEFAULT_USER_PROFILE.id,
+      runningLevel: RUNNING_LEVELS.find(rl => rl.value === newProfileCandidate.runningLevel) 
+                      ? newProfileCandidate.runningLevel 
+                      : DEFAULT_USER_PROFILE.runningLevel,
+      trainingPlan: TRAINING_PLANS.find(tp => tp.value === newProfileCandidate.trainingPlan) 
+                      ? newProfileCandidate.trainingPlan 
+                      : DEFAULT_USER_PROFILE.trainingPlan,
+      weatherUnit: WEATHER_UNITS.find(wu => wu.value === newProfileCandidate.weatherUnit)
+                      ? newProfileCandidate.weatherUnit
+                      : DEFAULT_USER_PROFILE.weatherUnit,
+      newsletterDelivery: NEWSLETTER_DELIVERY_OPTIONS.find(nd => nd.value === newProfileCandidate.newsletterDelivery)
+                      ? newProfileCandidate.newsletterDelivery
+                      : DEFAULT_USER_PROFILE.newsletterDelivery,
+    };
+
     setUserProfile(validatedProfile);
     setIsProfileComplete(checkProfileCompleteness(validatedProfile));
     try {
@@ -98,4 +121,3 @@ export const useUserProfile = () => {
   }
   return context;
 };
-

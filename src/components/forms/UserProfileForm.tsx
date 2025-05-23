@@ -43,14 +43,12 @@ const formSchema = z.object({
   trainingPlan: z.enum(["5k", "10k", "half-marathon", "marathon", "ultra"], {
     errorMap: () => ({ message: "Please select a training plan." }),
   }),
-  // raceDistance field removed
-  planStartDate: z.string().optional(), // Will be an ISO string
-  raceDate: z.string().optional(), // Will be an ISO string
+  planStartDate: z.string().optional(), 
+  raceDate: z.string().optional(), 
   weatherUnit: z.enum(["C", "F"]),
   newsletterDelivery: z.enum(["email", "hangouts"]),
 }).refine(data => {
   if (data.raceDate && data.planStartDate) {
-    // Ensure dates are valid before comparing
     const planStartDateValid = parseISO(data.planStartDate);
     const raceDateValid = parseISO(data.raceDate);
     if (isValid(planStartDateValid) && isValid(raceDateValid)) {
@@ -68,11 +66,11 @@ export function UserProfileForm() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { // These will be overridden by useEffect -> form.reset
+    defaultValues: { 
       name: "",
       location: "",
-      runningLevel: "beginner", // Fallback default
-      trainingPlan: "5k", // Fallback default
+      runningLevel: "beginner",
+      trainingPlan: "5k",
       planStartDate: undefined,
       raceDate: undefined,
       weatherUnit: "F",
@@ -98,7 +96,7 @@ export function UserProfileForm() {
 
   useEffect(() => {
     if (watchedRaceDate && watchedTrainingPlan) {
-      const newPlanStartDate = calculatePlanStartDate(watchedRaceDate, watchedTrainingPlan);
+      const newPlanStartDate = calculatePlanStartDate(watchedRaceDate, watchedTrainingPlan as TrainingPlanType);
       if (newPlanStartDate) {
         form.setValue("planStartDate", newPlanStartDate, { shouldValidate: true });
       }
@@ -108,20 +106,20 @@ export function UserProfileForm() {
 
   useEffect(() => {
     if (!loading && userProfile) {
-      let initialPlanStartDate = userProfile.planStartDate;
+      let planStartDateForForm = userProfile.planStartDate;
       if (userProfile.raceDate && userProfile.trainingPlan) {
-        initialPlanStartDate = calculatePlanStartDate(userProfile.raceDate, userProfile.trainingPlan) || userProfile.planStartDate;
+        planStartDateForForm = calculatePlanStartDate(userProfile.raceDate, userProfile.trainingPlan) || userProfile.planStartDate;
       }
 
       form.reset({
-        name: userProfile.name || "",
-        location: userProfile.location || "",
-        runningLevel: userProfile.runningLevel || "beginner", // Ensures a valid enum value
-        trainingPlan: userProfile.trainingPlan || "5k", // Ensures a valid enum value
-        planStartDate: initialPlanStartDate,
+        name: userProfile.name,
+        location: userProfile.location,
+        runningLevel: userProfile.runningLevel, // Directly use validated value from context
+        trainingPlan: userProfile.trainingPlan, // Directly use validated value from context
+        planStartDate: planStartDateForForm,
         raceDate: userProfile.raceDate,
-        weatherUnit: userProfile.weatherUnit || "F",
-        newsletterDelivery: userProfile.newsletterDelivery || "email",
+        weatherUnit: userProfile.weatherUnit, // Directly use validated value from context
+        newsletterDelivery: userProfile.newsletterDelivery, // Directly use validated value from context
       });
     }
   }, [loading, userProfile, form, calculatePlanStartDate]);
@@ -135,19 +133,20 @@ export function UserProfileForm() {
       finalPlanStartDate = format(new Date(), "yyyy-MM-dd");
     }
 
-    const newProfile: UserProfile = {
-      id: userProfile.id || uuidv4(),
+    // Construct the UserProfile object with all fields defined in the type
+    const updatedProfile: UserProfile = {
+      id: userProfile.id || uuidv4(), // Ensure ID is always present
       name: values.name,
       location: values.location,
-      runningLevel: values.runningLevel as RunningLevel, // Already validated by schema
-      trainingPlan: values.trainingPlan as TrainingPlanType, // Already validated by schema
-      // raceDistance is no longer part of UserProfile
+      runningLevel: values.runningLevel, // Already validated by Zod
+      trainingPlan: values.trainingPlan, // Already validated by Zod
       planStartDate: finalPlanStartDate,
       raceDate: values.raceDate,
-      weatherUnit: values.weatherUnit as WeatherUnit,
-      newsletterDelivery: values.newsletterDelivery as NewsletterDelivery,
+      weatherUnit: values.weatherUnit, // Already validated by Zod
+      newsletterDelivery: values.newsletterDelivery, // Already validated by Zod
     };
-    setUserProfileState(newProfile);
+    
+    setUserProfileState(updatedProfile);
     toast({
       title: "Profile Saved!",
       description: "Your preferences have been updated.",
@@ -155,7 +154,7 @@ export function UserProfileForm() {
   }
 
   if (loading) {
-    return <div>Loading profile...</div>;
+    return <div className="text-center p-10">Loading profile...</div>;
   }
 
   return (
@@ -191,7 +190,7 @@ export function UserProfileForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Running Level</FormLabel>
-              <Select onValueChange={field.onChange} value={field.value} /* No '|| undefined', use direct value */>
+              <Select onValueChange={field.onChange} value={field.value}>
                 <FormControl><SelectTrigger><SelectValue placeholder="Select your running level" /></SelectTrigger></FormControl>
                 <SelectContent>
                   {RUNNING_LEVELS.map((level) => (<SelectItem key={level.value} value={level.value}>{level.label}</SelectItem>))}
@@ -220,14 +219,12 @@ export function UserProfileForm() {
                        form.setValue("planStartDate", newPlanStartDate, { shouldValidate: true });
                      }
                   } else if (!currentRaceDate) {
-                    // If no race date, set plan start date to today if it's not already set or if plan changes
-                    // This logic ensures planStartDate is updated if plan changes without a race date
                      if (!form.getValues("planStartDate") || (userProfile && userProfile.trainingPlan !== selectedPlanValue)) {
                          form.setValue("planStartDate", format(new Date(), "yyyy-MM-dd"), { shouldValidate: true });
                     }
                   }
                 }}
-                value={field.value} /* No '|| undefined', use direct value */
+                value={field.value}
               >
                 <FormControl><SelectTrigger><SelectValue placeholder="Select a training plan" /></SelectTrigger></FormControl>
                 <SelectContent>
@@ -239,7 +236,6 @@ export function UserProfileForm() {
             </FormItem>
           )}
         />
-        {/* Race Distance Field Removed */}
 
         <FormField
           control={form.control}
@@ -257,9 +253,9 @@ export function UserProfileForm() {
                         !field.value && "text-muted-foreground"
                       )}
                     >
-                      {field.value && isValid(parseISO(field.value)) ? ( // Check validity before formatting
+                      {field.value && isValid(parseISO(field.value)) ? 
                         format(parseISO(field.value), "PPP")
-                      ) : (
+                       : (
                         <span>Pick a race date</span>
                       )}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -280,10 +276,10 @@ export function UserProfileForm() {
                           form.setValue("planStartDate", newPlanStartDate, { shouldValidate: true });
                         }
                       } else if (!newRaceDate) {
-                        form.setValue("planStartDate", undefined, { shouldValidate: true });
+                        form.setValue("planStartDate", undefined, { shouldValidate: true }); // Clear plan start date if race date is cleared
                       }
                     }}
-                    disabled={(date) => date < addDays(new Date(), -1) }
+                    disabled={(date) => date < addDays(new Date(), -1) } // Prevent selecting past dates
                     initialFocus
                   />
                 </PopoverContent>
@@ -310,13 +306,13 @@ export function UserProfileForm() {
                       className={cn(
                         "w-full pl-3 text-left font-normal",
                         !field.value && "text-muted-foreground",
-                        !!watchedRaceDate && "bg-muted/50 cursor-not-allowed"
+                        !!watchedRaceDate && "bg-muted/50 cursor-not-allowed" // Visually indicate disabled state
                       )}
-                      disabled={!!watchedRaceDate}
+                      disabled={!!watchedRaceDate} // Disable if raceDate is set
                     >
-                      {field.value && isValid(parseISO(field.value)) ? ( // Check validity
+                      {field.value && isValid(parseISO(field.value)) ? 
                         format(parseISO(field.value), "PPP")
-                      ) : (
+                       : (
                         <span>Pick a start date</span>
                       )}
                       <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
@@ -328,11 +324,11 @@ export function UserProfileForm() {
                     mode="single"
                     selected={field.value && isValid(parseISO(field.value)) ? parseISO(field.value) : undefined}
                     onSelect={(date) => {
-                        if (!watchedRaceDate) {
+                        if (!watchedRaceDate) { // Only allow manual selection if raceDate is not set
                            field.onChange(date ? format(date, "yyyy-MM-dd") : undefined);
                         }
                     }}
-                    disabled={(date) => (!!watchedRaceDate || date < addDays(new Date(), -365)) }
+                    disabled={(date) => (!!watchedRaceDate || date < addDays(new Date(), -365)) } // Disable if raceDate is set or too far in past
                     initialFocus
                   />
                 </PopoverContent>
@@ -388,4 +384,3 @@ export function UserProfileForm() {
     </Form>
   );
 }
-
