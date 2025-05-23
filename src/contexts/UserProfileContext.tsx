@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { UserProfile, RunningLevel, TrainingPlan, WeatherUnit, NewsletterDelivery } from "@/lib/types";
@@ -16,14 +17,16 @@ const UserProfileContext = createContext<UserProfileContextType | undefined>(und
 // Helper function to check profile completeness
 const checkProfileCompleteness = (profile: UserProfile | null): boolean => {
   if (!profile) return false;
+  // RaceDate is optional, so not included in this basic completeness check for now.
+  // PlanStartDate is also optional but often derived or defaulted.
   return !!(
     profile.name &&
     profile.location &&
     profile.runningLevel &&
     profile.trainingPlan &&
     profile.raceDistance &&
-    profile.weatherUnit && // Added weatherUnit check
-    profile.newsletterDelivery // Added newsletterDelivery check
+    profile.weatherUnit &&
+    profile.newsletterDelivery
   );
 };
 
@@ -50,6 +53,7 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
           trainingPlan: parsedProfile.trainingPlan || DEFAULT_USER_PROFILE.trainingPlan,
           raceDistance: parsedProfile.raceDistance || DEFAULT_USER_PROFILE.raceDistance,
           planStartDate: parsedProfile.planStartDate, // Can be undefined
+          raceDate: parsedProfile.raceDate, // Can be undefined
           weatherUnit: parsedProfile.weatherUnit || DEFAULT_USER_PROFILE.weatherUnit,
           newsletterDelivery: parsedProfile.newsletterDelivery || DEFAULT_USER_PROFILE.newsletterDelivery,
         };
@@ -94,3 +98,4 @@ export const useUserProfile = () => {
   }
   return context;
 };
+

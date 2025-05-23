@@ -1,3 +1,4 @@
+
 export const RUNNING_LEVELS = [
   { value: "beginner", label: "Beginner" },
   { value: "intermediate", label: "Intermediate" },
@@ -30,6 +31,8 @@ export const DEFAULT_USER_PROFILE = {
   trainingPlan: '' as const, // Ensure it's typed correctly if empty
   raceDistance: '',
   planStartDate: undefined,
+  raceDate: undefined,
   weatherUnit: "F" as const,
   newsletterDelivery: "email" as const,
 };
+

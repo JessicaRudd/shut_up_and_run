@@ -1,3 +1,4 @@
+
 export type RunningLevel = "beginner" | "intermediate" | "advanced" | "";
 export type TrainingPlan = "5k" | "10k" | "half-marathon" | "marathon" | "ultra" | "";
 export type WeatherUnit = "C" | "F" | "";
@@ -10,7 +11,8 @@ export interface UserProfile {
   runningLevel: RunningLevel;
   trainingPlan: TrainingPlan;
   raceDistance: string; // e.g., "50k", "100 miles"
-  planStartDate?: string; // ISO date string, e.g., "2024-07-28"
+  planStartDate?: string; // ISO date string, e.g., "2024-07-28". This is the *effective* start date.
+  raceDate?: string; // ISO date string, e.g., "2024-10-20"
   weatherUnit: WeatherUnit;
   newsletterDelivery: NewsletterDelivery;
 }
@@ -47,4 +49,6 @@ export interface DatedWorkout {
   dayOfPlan: number;
   weekOfPlan: number;
   isRestDay: boolean;
+  isRaceDay?: boolean; // Added for race day identification
 }
+
