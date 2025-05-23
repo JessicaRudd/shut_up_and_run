@@ -26,7 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { useUserProfile } from "@/contexts/UserProfileContext";
-import { RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS } from "@/lib/constants";
+import { RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS, DEFAULT_USER_PROFILE } from "@/lib/constants";
 import type { UserProfile, RunningLevel, TrainingPlan as TrainingPlanType, WeatherUnit, NewsletterDelivery } from "@/lib/types";
 import { useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
@@ -43,8 +43,8 @@ const formSchema = z.object({
   trainingPlan: z.enum(["5k", "10k", "half-marathon", "marathon", "ultra"], {
     errorMap: () => ({ message: "Please select a training plan." }),
   }),
-  planStartDate: z.string().optional(), 
-  raceDate: z.string().optional(), 
+  planStartDate: z.string().optional(),
+  raceDate: z.string().optional(),
   weatherUnit: z.enum(["C", "F"]),
   newsletterDelivery: z.enum(["email", "hangouts"]),
 }).refine(data => {
@@ -66,15 +66,15 @@ export function UserProfileForm() {
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: { 
+    defaultValues: {
       name: "",
       location: "",
-      runningLevel: "beginner",
-      trainingPlan: "5k",
+      runningLevel: DEFAULT_USER_PROFILE.runningLevel, // Use default from constants
+      trainingPlan: DEFAULT_USER_PROFILE.trainingPlan, // Use default from constants
       planStartDate: undefined,
       raceDate: undefined,
-      weatherUnit: "F",
-      newsletterDelivery: "email",
+      weatherUnit: DEFAULT_USER_PROFILE.weatherUnit,
+      newsletterDelivery: DEFAULT_USER_PROFILE.newsletterDelivery,
     },
   });
 
@@ -111,15 +111,22 @@ export function UserProfileForm() {
         planStartDateForForm = calculatePlanStartDate(userProfile.raceDate, userProfile.trainingPlan) || userProfile.planStartDate;
       }
 
+      // Ensure values for Selects are definitely among the valid options
+      const validRunningLevel = RUNNING_LEVELS.find(rl => rl.value === userProfile.runningLevel)?.value || DEFAULT_USER_PROFILE.runningLevel;
+      const validTrainingPlan = TRAINING_PLANS.find(tp => tp.value === userProfile.trainingPlan)?.value || DEFAULT_USER_PROFILE.trainingPlan;
+      const validWeatherUnit = WEATHER_UNITS.find(wu => wu.value === userProfile.weatherUnit)?.value || DEFAULT_USER_PROFILE.weatherUnit;
+      const validNewsletterDelivery = NEWSLETTER_DELIVERY_OPTIONS.find(nd => nd.value === userProfile.newsletterDelivery)?.value || DEFAULT_USER_PROFILE.newsletterDelivery;
+
+
       form.reset({
         name: userProfile.name,
         location: userProfile.location,
-        runningLevel: userProfile.runningLevel, // Directly use validated value from context
-        trainingPlan: userProfile.trainingPlan, // Directly use validated value from context
+        runningLevel: validRunningLevel,
+        trainingPlan: validTrainingPlan,
         planStartDate: planStartDateForForm,
         raceDate: userProfile.raceDate,
-        weatherUnit: userProfile.weatherUnit, // Directly use validated value from context
-        newsletterDelivery: userProfile.newsletterDelivery, // Directly use validated value from context
+        weatherUnit: validWeatherUnit,
+        newsletterDelivery: validNewsletterDelivery,
       });
     }
   }, [loading, userProfile, form, calculatePlanStartDate]);
@@ -130,22 +137,23 @@ export function UserProfileForm() {
     if (values.raceDate && values.trainingPlan) {
       finalPlanStartDate = calculatePlanStartDate(values.raceDate, values.trainingPlan as TrainingPlanType);
     } else if (!values.raceDate && !values.planStartDate) {
+      // If no race date and no plan start date, default plan start date to today
       finalPlanStartDate = format(new Date(), "yyyy-MM-dd");
     }
 
-    // Construct the UserProfile object with all fields defined in the type
+
     const updatedProfile: UserProfile = {
-      id: userProfile.id || uuidv4(), // Ensure ID is always present
+      id: userProfile.id || uuidv4(),
       name: values.name,
       location: values.location,
-      runningLevel: values.runningLevel, // Already validated by Zod
-      trainingPlan: values.trainingPlan, // Already validated by Zod
+      runningLevel: values.runningLevel,
+      trainingPlan: values.trainingPlan,
       planStartDate: finalPlanStartDate,
       raceDate: values.raceDate,
-      weatherUnit: values.weatherUnit, // Already validated by Zod
-      newsletterDelivery: values.newsletterDelivery, // Already validated by Zod
+      weatherUnit: values.weatherUnit,
+      newsletterDelivery: values.newsletterDelivery,
     };
-    
+
     setUserProfileState(updatedProfile);
     toast({
       title: "Profile Saved!",
@@ -219,6 +227,7 @@ export function UserProfileForm() {
                        form.setValue("planStartDate", newPlanStartDate, { shouldValidate: true });
                      }
                   } else if (!currentRaceDate) {
+                     // If no race date, and user changes plan, or planStartDate is not set, default planStartDate to today
                      if (!form.getValues("planStartDate") || (userProfile && userProfile.trainingPlan !== selectedPlanValue)) {
                          form.setValue("planStartDate", format(new Date(), "yyyy-MM-dd"), { shouldValidate: true });
                     }
@@ -253,7 +262,7 @@ export function UserProfileForm() {
                         !field.value && "text-muted-foreground"
                       )}
                     >
-                      {field.value && isValid(parseISO(field.value)) ? 
+                      {field.value && isValid(parseISO(field.value)) ?
                         format(parseISO(field.value), "PPP")
                        : (
                         <span>Pick a race date</span>
@@ -276,10 +285,12 @@ export function UserProfileForm() {
                           form.setValue("planStartDate", newPlanStartDate, { shouldValidate: true });
                         }
                       } else if (!newRaceDate) {
-                        form.setValue("planStartDate", undefined, { shouldValidate: true }); // Clear plan start date if race date is cleared
+                        // If race date is cleared, set plan start date based on whether it's already set or default to today
+                        const existingPlanStartDate = form.getValues("planStartDate");
+                        form.setValue("planStartDate", existingPlanStartDate || format(new Date(), "yyyy-MM-dd") , { shouldValidate: true });
                       }
                     }}
-                    disabled={(date) => date < addDays(new Date(), -1) } // Prevent selecting past dates
+                    disabled={(date) => date < addDays(new Date(), -1) } 
                     initialFocus
                   />
                 </PopoverContent>
@@ -306,11 +317,11 @@ export function UserProfileForm() {
                       className={cn(
                         "w-full pl-3 text-left font-normal",
                         !field.value && "text-muted-foreground",
-                        !!watchedRaceDate && "bg-muted/50 cursor-not-allowed" // Visually indicate disabled state
+                        !!watchedRaceDate && "bg-muted/50 cursor-not-allowed"
                       )}
-                      disabled={!!watchedRaceDate} // Disable if raceDate is set
+                      disabled={!!watchedRaceDate} 
                     >
-                      {field.value && isValid(parseISO(field.value)) ? 
+                      {field.value && isValid(parseISO(field.value)) ?
                         format(parseISO(field.value), "PPP")
                        : (
                         <span>Pick a start date</span>
@@ -324,18 +335,18 @@ export function UserProfileForm() {
                     mode="single"
                     selected={field.value && isValid(parseISO(field.value)) ? parseISO(field.value) : undefined}
                     onSelect={(date) => {
-                        if (!watchedRaceDate) { // Only allow manual selection if raceDate is not set
+                        if (!watchedRaceDate) { 
                            field.onChange(date ? format(date, "yyyy-MM-dd") : undefined);
                         }
                     }}
-                    disabled={(date) => (!!watchedRaceDate || date < addDays(new Date(), -365)) } // Disable if raceDate is set or too far in past
+                    disabled={(date) => (!!watchedRaceDate || date < addDays(new Date(), -365)) } 
                     initialFocus
                   />
                 </PopoverContent>
               </Popover>
               <FormDescription>
-                {watchedRaceDate 
-                  ? "Automatically calculated based on your race date and plan duration." 
+                {watchedRaceDate
+                  ? "Automatically calculated based on your race date and plan duration."
                   : "Select when your training plan should begin. If not set, defaults to today upon saving."}
               </FormDescription>
               <FormMessage />
