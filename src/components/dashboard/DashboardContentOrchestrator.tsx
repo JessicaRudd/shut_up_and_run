@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -5,6 +6,7 @@ import type { UserProfile } from "@/lib/types";
 import { customizeNewsletter, type CustomizeNewsletterOutput, type CustomizeNewsletterInput } from "@/ai/flows/customize-newsletter-content";
 import { mockArticles } from "@/lib/mockNews"; 
 import { getTodaysWorkout } from "@/lib/workoutUtils";
+import { getWeatherByLocation } from "@/services/weatherService"; // Import new weather service
 
 import { GreetingSection } from "./GreetingSection";
 import { WeatherSection } from "./WeatherSection";
@@ -13,21 +15,6 @@ import { NewsSection } from "./NewsSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
-
-// Mock weather data to be passed to AI (as AI expects a string)
-// In a real app, this would come from a weather API
-const mockWeatherData = {
-  temperature: "18°C", // Keep as a base, AI will be asked to format
-  condition: "Partly Cloudy",
-  humidity: "60%",
-  wind: "10 km/h",
-  forecast: "Clear skies expected tonight.",
-};
-
-const getMockWeatherString = (): string => {
-  // This string will be given to the AI, along with the user's unit preference.
-  return `${mockWeatherData.condition}, temp: ${mockWeatherData.temperature}. Humidity: ${mockWeatherData.humidity}, Wind: ${mockWeatherData.wind}. Forecast: ${mockWeatherData.forecast}`;
-}
 
 interface DashboardContentOrchestratorProps {
   userProfile: UserProfile;
@@ -40,8 +27,8 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
 
   useEffect(() => {
     if (!userProfile.name || !userProfile.location || !userProfile.weatherUnit) {
-      // Dependencies for AI call not met, can happen briefly or if profile incomplete
       setLoading(false);
+      setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
       return;
     }
 
@@ -50,7 +37,10 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
       setError(null);
       try {
         const todaysWorkout = getTodaysWorkout(userProfile);
-        const weatherString = getMockWeatherString(); 
+        
+        // Fetch real weather data
+        const weatherApiUnit = userProfile.weatherUnit === "C" ? "metric" : "imperial";
+        const weatherStringFromService = await getWeatherByLocation(userProfile.location, weatherApiUnit);
 
         const input: CustomizeNewsletterInput = {
           userName: userProfile.name,
@@ -60,15 +50,23 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           raceDistance: userProfile.raceDistance || userProfile.trainingPlan || "5k",
           workout: todaysWorkout,
           newsStories: mockArticles.map(a => ({ title: a.title, url: a.url, content: a.content })),
-          weather: weatherString,
-          weatherUnit: userProfile.weatherUnit || "F", // Pass user's preference
+          weather: weatherStringFromService, // Use real weather string
+          weatherUnit: userProfile.weatherUnit || "F", 
         };
         
         const result = await customizeNewsletter(input);
         setNewsletterData(result);
-      } catch (err) {
-        console.error("Error fetching personalized newsletter data:", err);
-        setError("Could not load your personalized dashboard. Please try again later.");
+      } catch (err: any) {
+        console.error("Error fetching personalized newsletter data or weather:", err);
+        let errorMessage = "Could not load your personalized dashboard. ";
+        if (err.message) {
+          errorMessage += err.message;
+        } else if (typeof err === 'string') {
+          errorMessage += err;
+        } else {
+          errorMessage += "An unknown error occurred."
+        }
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -105,7 +103,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
       <Alert variant="default" className="mt-6">
         <AlertTriangle className="h-5 w-5" />
         <AlertTitle>Dashboard Content Unavailable</AlertTitle>
-        <AlertDescription>We are having trouble loading your personalized content. Please ensure your profile is complete and try again.</AlertDescription>
+        <AlertDescription>We are having trouble generating your personalized content at the moment. Please ensure your profile is complete and try refreshing. If the issue persists, the weather service or AI service might be temporarily unavailable.</AlertDescription>
       </Alert>
     );
   }
@@ -117,7 +115,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <WeatherSection 
           location={userProfile.location} 
-          weatherString={newsletterData.weather} // This will be the AI-formatted string
+          weatherString={newsletterData.weather} 
         />
         <WorkoutSection 
           userProfile={userProfile} 
