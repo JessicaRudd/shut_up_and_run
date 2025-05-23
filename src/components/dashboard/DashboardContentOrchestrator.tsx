@@ -15,6 +15,7 @@ import { NewsSection } from "./NewsSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import { TRAINING_PLANS } from "@/lib/constants";
 
 interface DashboardContentOrchestratorProps {
   userProfile: UserProfile;
@@ -49,17 +50,29 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
         if ('error' in weatherResult) {
           console.warn("Weather service returned an error:", weatherResult.error);
           weatherInputForAI = { error: weatherResult.error };
-          setWeatherErrorForAI(weatherResult.error); // Store this to potentially show a more direct error if AI also fails
+          setWeatherErrorForAI(weatherResult.error); 
         } else {
-          weatherInputForAI = weatherResult as DailyForecastData; // Type assertion after check
+          weatherInputForAI = weatherResult as DailyForecastData;
         }
+        
+        // Derive raceDistance from trainingPlan for AI context
+        let derivedRaceDistance = "General Fitness";
+        if (userProfile.trainingPlan) {
+            const planDetails = TRAINING_PLANS.find(p => p.value === userProfile.trainingPlan);
+            if (planDetails) {
+                derivedRaceDistance = planDetails.label.replace(" Plan", "").replace(" Race", ""); // e.g. "5K", "Half Marathon"
+            } else {
+                derivedRaceDistance = userProfile.trainingPlan; // Fallback to plan value if not in constants
+            }
+        }
+
 
         const input: CustomizeNewsletterInput = {
           userName: userProfile.name,
           location: userProfile.location,
           runningLevel: userProfile.runningLevel || "beginner",
           trainingPlanType: userProfile.trainingPlan || "5k",
-          raceDistance: userProfile.raceDistance || userProfile.trainingPlan || "5k",
+          raceDistance: derivedRaceDistance, // Use derived value
           workout: todaysWorkout,
           newsStories: mockArticles.map(a => ({ title: a.title, url: a.url, content: a.content })),
           weather: weatherInputForAI,
@@ -78,7 +91,6 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
         } else {
           errorMessage += "An unknown error occurred."
         }
-         // If AI failed and we also had a weather specific error, prioritize showing that.
         if (weatherErrorForAI && errorMessage.includes("AI")) {
             setError(`Failed to process weather data: ${weatherErrorForAI}. ${errorMessage}`);
         } else {
@@ -90,17 +102,18 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     }
 
     fetchNewsletterData();
-  }, [userProfile, weatherErrorForAI]); // Added weatherErrorForAI to dependencies to avoid stale closure issues, though it's set within.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile]); // Removed weatherErrorForAI from dep array as it caused loops. It's set within effect.
 
   if (loading) {
     return (
       <div className="space-y-6">
-        <Skeleton className="h-28 w-full" /> {/* Greeting */}
+        <Skeleton className="h-28 w-full" />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Skeleton className="h-64 w-full" /> {/* Weather (taller now) */}
-          <Skeleton className="h-48 w-full" /> {/* Workout */}
+          <Skeleton className="h-64 w-full" /> 
+          <Skeleton className="h-48 w-full" /> 
         </div>
-        <Skeleton className="h-72 w-full" /> {/* News */}
+        <Skeleton className="h-72 w-full" /> 
       </div>
     );
   }
@@ -154,3 +167,4 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     </div>
   );
 }
+

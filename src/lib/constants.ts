@@ -27,9 +27,9 @@ export const DEFAULT_USER_PROFILE = {
   id: '',
   name: '',
   location: '',
-  runningLevel: '' as const, // Ensure it's typed correctly if empty
-  trainingPlan: '' as const, // Ensure it's typed correctly if empty
-  raceDistance: '',
+  runningLevel: "beginner" as const, // Default to a valid enum value
+  trainingPlan: "5k" as const, // Default to a valid enum value
+  // raceDistance: '', // Removed
   planStartDate: undefined,
   raceDate: undefined,
   weatherUnit: "F" as const,

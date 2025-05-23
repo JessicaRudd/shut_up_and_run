@@ -10,7 +10,7 @@ export interface UserProfile {
   location: string; // e.g., "New York"
   runningLevel: RunningLevel;
   trainingPlan: TrainingPlan;
-  raceDistance: string; // e.g., "50k", "100 miles"
+  // raceDistance: string; // Removed - will be inferred from trainingPlan for AI context
   planStartDate?: string; // ISO date string, e.g., "2024-07-28". This is the *effective* start date.
   raceDate?: string; // ISO date string, e.g., "2024-10-20"
   weatherUnit: WeatherUnit;

@@ -17,14 +17,12 @@ const UserProfileContext = createContext<UserProfileContextType | undefined>(und
 // Helper function to check profile completeness
 const checkProfileCompleteness = (profile: UserProfile | null): boolean => {
   if (!profile) return false;
-  // RaceDate is optional, so not included in this basic completeness check for now.
-  // PlanStartDate is also optional but often derived or defaulted.
+  // RaceDate is optional. PlanStartDate is also optional but often derived or defaulted.
   return !!(
     profile.name &&
     profile.location &&
-    profile.runningLevel &&
-    profile.trainingPlan &&
-    profile.raceDistance &&
+    profile.runningLevel && // Will be "beginner", "intermediate", or "advanced"
+    profile.trainingPlan && // Will be "5k", "10k", etc.
     profile.weatherUnit &&
     profile.newsletterDelivery
   );
@@ -41,19 +39,20 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
     try {
       const storedProfile = localStorage.getItem("userProfile");
       if (storedProfile) {
-        const parsedProfile = JSON.parse(storedProfile) as UserProfile;
+        const parsedProfile = JSON.parse(storedProfile) as Partial<UserProfile>; // Partial to handle old profiles
         // Ensure all fields from UserProfile type exist, defaulting if necessary
         loadedProfile = {
-          ...DEFAULT_USER_PROFILE, // Start with defaults
-          ...parsedProfile, // Override with stored values
           id: parsedProfile.id || DEFAULT_USER_PROFILE.id,
           name: parsedProfile.name || DEFAULT_USER_PROFILE.name,
           location: parsedProfile.location || DEFAULT_USER_PROFILE.location,
-          runningLevel: parsedProfile.runningLevel || DEFAULT_USER_PROFILE.runningLevel,
-          trainingPlan: parsedProfile.trainingPlan || DEFAULT_USER_PROFILE.trainingPlan,
-          raceDistance: parsedProfile.raceDistance || DEFAULT_USER_PROFILE.raceDistance,
-          planStartDate: parsedProfile.planStartDate, // Can be undefined
-          raceDate: parsedProfile.raceDate, // Can be undefined
+          runningLevel: (parsedProfile.runningLevel && RUNNING_LEVELS.find(rl => rl.value === parsedProfile.runningLevel)) 
+                          ? parsedProfile.runningLevel 
+                          : DEFAULT_USER_PROFILE.runningLevel,
+          trainingPlan: (parsedProfile.trainingPlan && TRAINING_PLANS.find(tp => tp.value === parsedProfile.trainingPlan))
+                          ? parsedProfile.trainingPlan
+                          : DEFAULT_USER_PROFILE.trainingPlan,
+          planStartDate: parsedProfile.planStartDate,
+          raceDate: parsedProfile.raceDate,
           weatherUnit: parsedProfile.weatherUnit || DEFAULT_USER_PROFILE.weatherUnit,
           newsletterDelivery: parsedProfile.newsletterDelivery || DEFAULT_USER_PROFILE.newsletterDelivery,
         };
@@ -69,11 +68,12 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const setUserProfileState = (profile: UserProfile) => {
-    // Ensure all parts of profile are at least empty strings or defaults for consistency
     const validatedProfile: UserProfile = {
         ...DEFAULT_USER_PROFILE, // Base defaults
         ...profile, // Apply incoming profile
         id: profile.id || userProfile.id || DEFAULT_USER_PROFILE.id, // Preserve ID if possible
+        runningLevel: profile.runningLevel || DEFAULT_USER_PROFILE.runningLevel,
+        trainingPlan: profile.trainingPlan || DEFAULT_USER_PROFILE.trainingPlan,
     };
     setUserProfile(validatedProfile);
     setIsProfileComplete(checkProfileCompleteness(validatedProfile));
