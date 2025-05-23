@@ -89,7 +89,7 @@ const CustomizeNewsletterOutputSchema = z.object({
     )
     .describe('An array of the top summarized and prioritized news stories.'),
   planEndNotification: z.string().optional().describe('A message to update the user profile when the plan ends.'),
-  dressMyRunSuggestion: z.string().describe('A concise recommendation for what to wear for the run based on weather at the recommended run time.'),
+  dressMyRunSuggestion: z.string().describe('A detailed, itemized recommendation for what to wear for the run based on weather at the recommended run time. Should list specific items like "hat, sunglasses, t-shirt, shorts".'),
 });
 export type CustomizeNewsletterOutput = z.infer<typeof CustomizeNewsletterOutputSchema>;
 
@@ -120,14 +120,13 @@ const summarizeNewsTool = ai.defineTool({
         priority: z.number().int().min(1).max(5).describe('The priority of the article (1 is highest).'),
       })
     ).max(5),
-    async handler(input) {
+    async handler(input) { // This handler is a placeholder. The LLM will use the tool description to generate the output.
       if (!input.articles || input.articles.length === 0) {
         return [];
       }
-      // Placeholder summarization and prioritization - LLM will do the real work via prompt
       return input.articles.slice(0, 5).map((article, index) => ({
         title: article.title,
-        summary: `Summary for ${input.runningLevel} runner targeting ${input.raceDistance}: ${article.content.substring(0, Math.min(100, article.content.length))}...`,
+        summary: `Summarized content for ${article.title.substring(0,30)}... based on user profile.`,
         url: article.url,
         priority: index + 1,
       }));
@@ -141,14 +140,8 @@ const generateGreetingTool = ai.defineTool({
     userName: z.string().describe('The name of the user.'),
   }),
   outputSchema: z.string().describe('The personalized greeting string, including a pun.'),
-  async handler(input) {
-    // Placeholder pun generation - LLM will do the real work via prompt
-    const puns = [
-      `Ready to hit the ground running, ${input.userName}? Hope your day is a marathon, not a sprint!`,
-      `Time to lace up, ${input.userName}! May your run be swift and your coffee strong.`,
-      `${input.userName}, let's make today legen-dairy with a great run!`,
-    ];
-    return puns[Math.floor(Math.random() * puns.length)] || `Hello ${input.userName}, have a great run!`;
+  async handler(input) { // This handler is a placeholder. The LLM will use the tool description to generate the output.
+    return `Hey ${input.userName}, ready to hit the pavement? Don't be a sub-scriber, be a run-scriber!`;
   },
 });
 
@@ -170,7 +163,7 @@ const prompt = ai.definePrompt({
   
   2. Provide local weather forecast and running recommendation:
      - The input 'weather' ({{{weather}}}) contains structured daily forecast data for {{{location}}} or an error object.
-     - If '{{{weather.error}}}' exists in the input 'weather' object, your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present.
+     - If '{{{weather.error}}}' exists in the input 'weather' object, your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present. In this error case, the 'dressMyRunSuggestion' field should also indicate unavailability due to weather.
      - Otherwise (if '{{{weather.hourly}}}' exists and '{{{weather.error}}}' does not):
        - For the 'weather' output field, construct a single informative paragraph. 
        - Step 1: Present the overall daily forecast summary. This should include:
@@ -195,11 +188,25 @@ const prompt = ai.definePrompt({
   5. Plan end notification: If the user's training plan has ended (this information might be implicitly part of the workout or overall context), include a 'planEndNotification' message encouraging them to update their profile. Omit if no plan end is indicated.
 
   6. Generate "Dress Your Run" suggestion:
-     - Based on the overall daily forecast AND specifically the weather conditions (temperature, 'feelsLike' temperature, wind, chance of precipitation) expected around the 'best time to run' you previously identified when generating the 'weather' field, provide a concise clothing recommendation.
-     - Consider factors like temperature ('{{{weather.hourly.[any_index_corresponding_to_best_time].temp}}}', '{{{weather.hourly.[any_index_corresponding_to_best_time].feelsLike}}}'), precipitation ('{{{weather.hourly.[any_index_corresponding_to_best_time].pop}}}'), and wind ('{{{weather.hourly.[any_index_corresponding_to_best_time].windSpeed}}}') for the specific recommended running slot. You will need to determine which hourly slot corresponds to your recommended run time.
-     - Provide practical advice. Examples: "For your run around 7 AM (feels like 10{{{weatherUnit}}}), a light jacket over a long-sleeve shirt, and leggings are advisable." or "It'll be warm (25{{{weatherUnit}}}) around your recommended 6 PM run, so a t-shirt and shorts will be great."
+     - Act as an expert running coach providing detailed clothing advice.
      - If the weather forecast was unavailable (i.e., '{{{weather.error}}}' was present in the weather input), output "Clothing recommendations are unavailable because the weather forecast could not be retrieved." for the 'dressMyRunSuggestion' field.
-     - Keep the suggestion to one or two sentences.
+     - Otherwise, based on the specific weather conditions (temperature, 'feelsLike' temperature, precipitation chance 'pop', wind speed, and general description like 'sunny', 'cloudy') expected around the 'best time to run' you previously identified when generating the 'weather' field, provide a DETAILED, ITEMIZED clothing recommendation.
+     - You must suggest specific types of clothing items. For example: "For your run around 7 AM (feels like 10{{{weatherUnit}}}, partly cloudy, 10% chance of rain, 5 mph wind):
+        - Top: Lightweight, moisture-wicking long-sleeve shirt.
+        - Bottoms: Running tights or leggings.
+        - Head: Light beanie or headband.
+        - Hands: Light gloves.
+        - Optional: A light, packable windbreaker if you are sensitive to wind."
+     - Consider different temperature ranges to guide your suggestions:
+        - Hot (>25°C / 77°F): Suggest items like a tank top or very light short-sleeve shirt, light shorts, sunglasses, sun-protective hat/visor.
+        - Warm (15-25°C / 59-77°F): Suggest items like a short-sleeve t-shirt, shorts or capris. Maybe a light vest if windy.
+        - Mild/Cool (5-15°C / 41-59°F): Suggest items like a long-sleeve base layer, possibly a light jacket or vest (especially if windy/rainy), tights or running pants. Light gloves/headband for cooler end.
+        - Cold (-5 to 5°C / 23-41°F): Suggest items like a thermal base layer, an insulating mid-layer (fleece/light jacket), possibly a wind/water-resistant outer shell, thermal tights, hat covering ears, gloves/mittens.
+        - Very Cold (< -5°C / < 23°F): Suggest multiple layers (wicking base, insulating mid, protective outer), warm hat, neck gaiter/balaclava, warm gloves/mittens, windproof thermal tights.
+     - Always consider 'pop' (chance of precipitation): if high, suggest a water-resistant or waterproof jacket appropriate for the temperature.
+     - Always consider 'windSpeed': if high, suggest a windbreaker or wind-resistant layer.
+     - If sunny, even if cool, suggest sunglasses.
+     - Keep the suggestion concise but ensure it's a list of specific items. The output should be a single string, use newlines for itemization if helpful for readability in the final display.
 
   User details for context and tool usage:
   - Name: {{{userName}}}
@@ -223,30 +230,30 @@ const customizeNewsletterFlow = ai.defineFlow(
     outputSchema: CustomizeNewsletterOutputSchema,
   },
   async (input: CustomizeNewsletterInput) => {
-    const {output} = await prompt(input); // The LLM will use the tools as needed.
+    const {output} = await prompt(input); 
     
     if (!output) {
-      // Fallback in case the LLM fails to produce an output matching the schema
       console.error("AI prompt did not produce expected output for input:", JSON.stringify(input, null, 2));
       
-      // Construct a minimal valid output
       const fallbackGreeting = `Hello ${input.userName}, have a great run!`;
-      
       let fallbackWeather: string;
+      let fallbackDressSuggestion = "Clothing recommendations are currently unavailable.";
+
       if (typeof input.weather === 'object' && input.weather && 'error' in input.weather && typeof input.weather.error === 'string') {
         fallbackWeather = `Weather forecast for ${input.location} is currently unavailable: ${input.weather.error}`;
+        // Dress suggestion also reflects weather error
+        fallbackDressSuggestion = `Clothing recommendations are unavailable because the weather forecast could not be retrieved: ${input.weather.error}`;
       } else {
         fallbackWeather = `Weather information for ${input.location} is currently being processed.`;
       }
       
       const fallbackWorkout = input.workout || "No workout information available.";
-      const fallbackDressSuggestion = "Clothing recommendations are currently unavailable.";
       
       return {
         greeting: fallbackGreeting,
         weather: fallbackWeather,
         workout: fallbackWorkout,
-        topStories: [], // Can't generate news without AI
+        topStories: [], 
         planEndNotification: undefined, 
         dressMyRunSuggestion: fallbackDressSuggestion,
       };
