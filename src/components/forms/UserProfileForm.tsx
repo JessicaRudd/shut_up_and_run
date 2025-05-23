@@ -22,8 +22,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useUserProfile } from "@/contexts/UserProfileContext";
-import { RUNNING_LEVELS, TRAINING_PLANS } from "@/lib/constants";
-import type { UserProfile, RunningLevel, TrainingPlan } from "@/lib/types";
+import { RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS } from "@/lib/constants";
+import type { UserProfile, RunningLevel, TrainingPlan, WeatherUnit, NewsletterDelivery } from "@/lib/types";
 import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
@@ -34,6 +34,8 @@ const formSchema = z.object({
   runningLevel: z.enum(["beginner", "intermediate", "advanced"]),
   trainingPlan: z.enum(["5k", "10k", "half-marathon", "marathon", "ultra"]),
   raceDistance: z.string().min(1, { message: "Race distance is required (e.g., 5k, 10k, 50 miles)." }),
+  weatherUnit: z.enum(["C", "F"]),
+  newsletterDelivery: z.enum(["email", "hangouts"]),
 });
 
 export function UserProfileForm() {
@@ -47,6 +49,8 @@ export function UserProfileForm() {
       runningLevel: "beginner",
       trainingPlan: "5k",
       raceDistance: "",
+      weatherUnit: "F",
+      newsletterDelivery: "email",
     },
   });
 
@@ -58,6 +62,8 @@ export function UserProfileForm() {
         runningLevel: userProfile.runningLevel || "beginner",
         trainingPlan: userProfile.trainingPlan || "5k",
         raceDistance: userProfile.raceDistance || (userProfile.trainingPlan !== "ultra" ? userProfile.trainingPlan : ""),
+        weatherUnit: userProfile.weatherUnit || "F",
+        newsletterDelivery: userProfile.newsletterDelivery || "email",
       });
     }
   }, [loading, userProfile, form]);
@@ -71,6 +77,8 @@ export function UserProfileForm() {
       trainingPlan: values.trainingPlan as TrainingPlan,
       raceDistance: values.raceDistance,
       planStartDate: userProfile.planStartDate && userProfile.trainingPlan === values.trainingPlan ? userProfile.planStartDate : new Date().toISOString().split('T')[0],
+      weatherUnit: values.weatherUnit as WeatherUnit,
+      newsletterDelivery: values.newsletterDelivery as NewsletterDelivery,
     };
     setUserProfileState(newProfile);
     toast({
@@ -120,7 +128,7 @@ export function UserProfileForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Running Level</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || undefined}>
+              <Select onValueChange={field.onChange} value={field.value || undefined} defaultValue={field.value}>
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select your running level" />
@@ -154,8 +162,8 @@ export function UserProfileForm() {
                      form.setValue("raceDistance", ""); // Clear if it was auto-filled from a non-ultra plan
                   }
                 }} 
-                defaultValue={field.value} 
                 value={field.value || undefined}
+                defaultValue={field.value}
               >
                 <FormControl>
                   <SelectTrigger>
@@ -185,6 +193,56 @@ export function UserProfileForm() {
                 <Input placeholder="e.g., 5k, 10k, 50 miles" {...field} />
               </FormControl>
               <FormDescription>Specify the distance you're training for (e.g., 5k, 10k, 21.1k, 42.2k, 50k, 100 miles).</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="weatherUnit"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Weather Unit</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || undefined} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select weather unit" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {WEATHER_UNITS.map((unit) => (
+                    <SelectItem key={unit.value} value={unit.value}>
+                      {unit.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>Choose how temperature is displayed.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="newsletterDelivery"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Newsletter Delivery</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || undefined} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select delivery method" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {NEWSLETTER_DELIVERY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>How you'd like to receive your newsletter.</FormDescription>
               <FormMessage />
             </FormItem>
           )}

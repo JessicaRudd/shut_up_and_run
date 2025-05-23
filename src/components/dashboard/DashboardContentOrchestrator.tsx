@@ -17,7 +17,7 @@ import { AlertTriangle } from "lucide-react";
 // Mock weather data to be passed to AI (as AI expects a string)
 // In a real app, this would come from a weather API
 const mockWeatherData = {
-  temperature: "18°C",
+  temperature: "18°C", // Keep as a base, AI will be asked to format
   condition: "Partly Cloudy",
   humidity: "60%",
   wind: "10 km/h",
@@ -25,7 +25,8 @@ const mockWeatherData = {
 };
 
 const getMockWeatherString = (): string => {
-  return `${mockWeatherData.condition}, ${mockWeatherData.temperature}. Humidity: ${mockWeatherData.humidity}, Wind: ${mockWeatherData.wind}. Forecast: ${mockWeatherData.forecast}`;
+  // This string will be given to the AI, along with the user's unit preference.
+  return `${mockWeatherData.condition}, temp: ${mockWeatherData.temperature}. Humidity: ${mockWeatherData.humidity}, Wind: ${mockWeatherData.wind}. Forecast: ${mockWeatherData.forecast}`;
 }
 
 interface DashboardContentOrchestratorProps {
@@ -38,8 +39,8 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!userProfile.name || !userProfile.location) {
-      // Dependencies for AI call not met, can happen briefly
+    if (!userProfile.name || !userProfile.location || !userProfile.weatherUnit) {
+      // Dependencies for AI call not met, can happen briefly or if profile incomplete
       setLoading(false);
       return;
     }
@@ -49,7 +50,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
       setError(null);
       try {
         const todaysWorkout = getTodaysWorkout(userProfile);
-        const weatherString = getMockWeatherString(); // Use mock weather string
+        const weatherString = getMockWeatherString(); 
 
         const input: CustomizeNewsletterInput = {
           userName: userProfile.name,
@@ -60,6 +61,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           workout: todaysWorkout,
           newsStories: mockArticles.map(a => ({ title: a.title, url: a.url, content: a.content })),
           weather: weatherString,
+          weatherUnit: userProfile.weatherUnit || "F", // Pass user's preference
         };
         
         const result = await customizeNewsletter(input);
@@ -113,7 +115,10 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
       <GreetingSection greetingWithName={newsletterData.greeting} />
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <WeatherSection location={userProfile.location} weatherString={newsletterData.weather} />
+        <WeatherSection 
+          location={userProfile.location} 
+          weatherString={newsletterData.weather} // This will be the AI-formatted string
+        />
         <WorkoutSection 
           userProfile={userProfile} 
           workoutSuggestion={newsletterData.workout}

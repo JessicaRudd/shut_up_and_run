@@ -1,6 +1,6 @@
 "use client";
 
-import type { UserProfile, RunningLevel, TrainingPlan } from "@/lib/types";
+import type { UserProfile, RunningLevel, TrainingPlan, WeatherUnit, NewsletterDelivery } from "@/lib/types";
 import { DEFAULT_USER_PROFILE } from "@/lib/constants";
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
@@ -21,7 +21,9 @@ const checkProfileCompleteness = (profile: UserProfile | null): boolean => {
     profile.location &&
     profile.runningLevel &&
     profile.trainingPlan &&
-    profile.raceDistance // Added raceDistance check
+    profile.raceDistance &&
+    profile.weatherUnit && // Added weatherUnit check
+    profile.newsletterDelivery // Added newsletterDelivery check
   );
 };
 
@@ -48,6 +50,8 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
           trainingPlan: parsedProfile.trainingPlan || DEFAULT_USER_PROFILE.trainingPlan,
           raceDistance: parsedProfile.raceDistance || DEFAULT_USER_PROFILE.raceDistance,
           planStartDate: parsedProfile.planStartDate, // Can be undefined
+          weatherUnit: parsedProfile.weatherUnit || DEFAULT_USER_PROFILE.weatherUnit,
+          newsletterDelivery: parsedProfile.newsletterDelivery || DEFAULT_USER_PROFILE.newsletterDelivery,
         };
       }
     } catch (error) {
@@ -61,7 +65,7 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const setUserProfileState = (profile: UserProfile) => {
-    // Ensure all parts of profile are at least empty strings for consistency
+    // Ensure all parts of profile are at least empty strings or defaults for consistency
     const validatedProfile: UserProfile = {
         ...DEFAULT_USER_PROFILE, // Base defaults
         ...profile, // Apply incoming profile

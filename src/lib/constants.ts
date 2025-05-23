@@ -12,6 +12,16 @@ export const TRAINING_PLANS = [
   { value: "ultra", label: "Ultra Marathon (50k+) Plan", durationWeeks: 20 },
 ];
 
+export const WEATHER_UNITS = [
+  { value: "F", label: "Fahrenheit (°F)" },
+  { value: "C", label: "Celsius (°C)" },
+];
+
+export const NEWSLETTER_DELIVERY_OPTIONS = [
+  { value: "email", label: "Email" },
+  { value: "hangouts", label: "Google Hangout Alert" },
+];
+
 export const DEFAULT_USER_PROFILE = {
   id: '',
   name: '',
@@ -20,4 +30,6 @@ export const DEFAULT_USER_PROFILE = {
   trainingPlan: '' as const, // Ensure it's typed correctly if empty
   raceDistance: '',
   planStartDate: undefined,
+  weatherUnit: "F" as const,
+  newsletterDelivery: "email" as const,
 };
