@@ -1,9 +1,10 @@
+
 // src/services/weatherService.ts
 'use server';
 
 import type { DailyForecastData, HourlyWeatherData } from '@/lib/types';
 import axios from 'axios';
-import { format, fromUnixTime,isToday, parseISO, startOfDay } from 'date-fns'; // For date manipulations
+import { format, fromUnixTime, startOfDay } from 'date-fns'; // Removed isToday, parseISO as they are not used
 
 const OPENWEATHERMAP_API_URL = 'https://api.openweathermap.org/data/2.5/forecast';
 
@@ -16,11 +17,13 @@ function convertToUserUnit(value: number, unit: 'metric' | 'imperial', type: 'sp
 }
 
 function formatTime(unixTimestamp: number, timezoneOffsetSeconds: number): string {
-  const date = fromUnixTime(unixTimestamp + timezoneOffsetSeconds);
-  return format(date, 'h:mm a'); // e.g., 6:00 AM
+  // Apply timezone offset before formatting
+  const dateInLocationTimezone = fromUnixTime(unixTimestamp + timezoneOffsetSeconds);
+  return format(dateInLocationTimezone, 'h:mm a'); // e.g., 6:00 AM
 }
 
 function formatDate(date: Date): string {
+  // Date is already in location's timezone (passed as displayDate)
   return format(date, "EEEE, MMMM do"); // e.g. Tuesday, July 30th
 }
 
@@ -51,48 +54,54 @@ export async function getWeatherByLocation(location: string, unit: 'metric' | 'i
         appid: apiKey,
       },
       headers: {
-        'User-Agent': 'ShutUpAndRunApp/1.0',
+        'User-Agent': 'ShutUpAndRunApp/1.0', // Good practice to set a User-Agent
       },
     });
 
     const rawData = response.data;
-    if (!rawData || !rawData.list || !rawData.city) {
-      return { error: `Could not retrieve detailed forecast for "${location}". The weather service returned incomplete data.` };
+    if (!rawData || !rawData.list || rawData.list.length === 0 || !rawData.city) {
+      return { error: `Could not retrieve detailed forecast for "${location}". The weather service returned incomplete or no data.` };
     }
     
     const timezoneOffsetSeconds = rawData.city.timezone;
-    const today = startOfDay(new Date(new Date().getTime() + timezoneOffsetSeconds * 1000)); // Current date in location's timezone
+    // Determine "today" in the location's timezone
+    const nowInUTC = new Date();
+    const todayInLocationTimezone = startOfDay(new Date(nowInUTC.getTime() + timezoneOffsetSeconds * 1000));
 
+    // Filter for forecasts that fall on "today" in the location's timezone
     const todaysForecastsRaw = rawData.list.filter((item: any) => {
-        // dt_txt is in UTC. We need to compare it to "today" in the location's timezone.
-        // An easier way: convert dt (UTC timestamp) to location's date and check if it's today.
         const itemDateInLocationTime = startOfDay(fromUnixTime(item.dt + timezoneOffsetSeconds));
-        return itemDateInLocationTime.getTime() === today.getTime();
+        return itemDateInLocationTime.getTime() === todayInLocationTimezone.getTime();
     });
 
-    if (todaysForecastsRaw.length === 0) {
-      // This might happen if it's late in the day and the forecast only has tomorrow's data.
-      // Or if the location is invalid and somehow passed previous checks.
-      // For now, let's try to get the next available day's forecast if today is empty.
-      // A more robust solution would be to analyze the API's full return.
-      // For this iteration, we'll indicate data is for the earliest available slots.
-       const firstAvailableSlot = rawData.list[0];
-       if (!firstAvailableSlot) return {error: `No future forecast data available for "${location}".`};
-       const firstSlotDate = startOfDay(fromUnixTime(firstAvailableSlot.dt + timezoneOffsetSeconds));
-       
-       const firstDayForecastsRaw = rawData.list.filter((item: any) => {
-            const itemDateInLocationTime = startOfDay(fromUnixTime(item.dt + timezoneOffsetSeconds));
-            return itemDateInLocationTime.getTime() === firstSlotDate.getTime();
-       });
+    let forecastToProcess: any[];
+    let dateToDisplay: Date;
 
-       if(firstDayForecastsRaw.length === 0) {
-         return { error: `No forecast data available for "${location}" for the immediate future.`};
-       }
-       // Use firstDayForecastsRaw instead of todaysForecastsRaw
-       return processForecastList(firstDayForecastsRaw, rawData, unit, location, timezoneOffsetSeconds, firstSlotDate);
+    if (todaysForecastsRaw.length > 0) {
+        forecastToProcess = todaysForecastsRaw;
+        dateToDisplay = todayInLocationTimezone;
+    } else {
+        // No forecast items for "today", try the first available day in the rawData.list
+        const firstAvailableSlot = rawData.list[0]; // rawData.list is guaranteed to be non-empty here
+        
+        // Determine the date for this first available slot in the location's timezone
+        const firstSlotDateInLocationTimezone = startOfDay(fromUnixTime(firstAvailableSlot.dt + timezoneOffsetSeconds));
+        
+        // Filter all items from rawData.list that fall on this firstSlotDate
+        const firstDayForecastsRaw = rawData.list.filter((item: any) => {
+            const itemDateInLocationTime = startOfDay(fromUnixTime(item.dt + timezoneOffsetSeconds));
+            return itemDateInLocationTime.getTime() === firstSlotDateInLocationTimezone.getTime();
+        });
+
+        if (firstDayForecastsRaw.length === 0) {
+            // This should be rare if rawData.list[0] exists and is processed correctly
+            return { error: `No usable forecast data found for "${location}" for the immediate future. The returned data might be for a past date or too far in the future.` };
+        }
+        forecastToProcess = firstDayForecastsRaw;
+        dateToDisplay = firstSlotDateInLocationTimezone;
     }
 
-    return processForecastList(todaysForecastsRaw, rawData, unit, location, timezoneOffsetSeconds, today);
+    return processForecastList(forecastToProcess, rawData, unit, location, timezoneOffsetSeconds, dateToDisplay);
 
   } catch (error: any) {
     console.error(`Error fetching forecast for "${location}":`, error.response?.data?.message || error.message);
@@ -113,12 +122,12 @@ export async function getWeatherByLocation(location: string, unit: 'metric' | 'i
 }
 
 function processForecastList(
-  forecastList: any[], 
+  forecastList: any[], // This list is now guaranteed to be for a single specific day
   rawData: any, 
   unit: 'metric' | 'imperial', 
-  location: string, 
+  location: string, // Though rawData.city.name is preferred for display
   timezoneOffsetSeconds: number,
-  displayDate: Date
+  displayDate: Date // The specific date (in location's timezone) these forecasts are for
 ): DailyForecastData {
 
   let tempMin = Infinity;
@@ -126,6 +135,24 @@ function processForecastList(
   let totalHumidity = 0;
   let totalWindSpeed = 0;
   let descriptions: Set<string> = new Set();
+
+  // Ensure forecastList is not empty before processing
+  if (forecastList.length === 0) {
+      // This case should ideally be prevented by the caller, but as a safeguard:
+      return {
+        locationName: rawData.city.name || location,
+        date: formatDate(displayDate),
+        overallDescription: "No specific forecast details available for this day.",
+        tempMin: 0,
+        tempMax: 0,
+        sunrise: formatTime(rawData.city.sunrise, timezoneOffsetSeconds),
+        sunset: formatTime(rawData.city.sunset, timezoneOffsetSeconds),
+        humidityAvg: 0,
+        windAvg: 0,
+        hourly: [],
+        error: "No hourly data found for the selected day." // Add an error to the object itself
+      };
+  }
 
   const hourly: HourlyWeatherData[] = forecastList.map((item: any) => {
     const temp = Math.round(item.main.temp);
@@ -147,18 +174,27 @@ function processForecastList(
     };
   });
   
-  const overallDescription = Array.from(descriptions).join(', ').replace(/,([^,]*)$/, ' and$1'); // "A, B and C"
+  const uniqueDescriptions = Array.from(descriptions);
+  let overallDescriptionText = "Varied conditions.";
+  if (uniqueDescriptions.length === 1) {
+    overallDescriptionText = uniqueDescriptions[0].charAt(0).toUpperCase() + uniqueDescriptions[0].slice(1) + ".";
+  } else if (uniqueDescriptions.length > 1) {
+    overallDescriptionText = uniqueDescriptions.join(', ').replace(/,([^,]*)$/, ' and$1');
+    overallDescriptionText = overallDescriptionText.charAt(0).toUpperCase() + overallDescriptionText.slice(1) + ".";
+  }
+
 
   return {
     locationName: rawData.city.name,
-    date: formatDate(displayDate),
-    overallDescription: overallDescription.charAt(0).toUpperCase() + overallDescription.slice(1) + ".",
-    tempMin: tempMin === Infinity ? 0 : tempMin, // handle case where no data
+    date: formatDate(displayDate), // Use the date passed in, which is already in location's timezone
+    overallDescription: overallDescriptionText,
+    tempMin: tempMin === Infinity ? 0 : tempMin,
     tempMax: tempMax === -Infinity ? 0 : tempMax,
     sunrise: formatTime(rawData.city.sunrise, timezoneOffsetSeconds),
     sunset: formatTime(rawData.city.sunset, timezoneOffsetSeconds),
-    humidityAvg: Math.round(totalHumidity / forecastList.length) || 0,
-    windAvg: convertToUserUnit(totalWindSpeed / forecastList.length, unit, 'speed') || 0,
+    humidityAvg: forecastList.length > 0 ? Math.round(totalHumidity / forecastList.length) : 0,
+    windAvg: forecastList.length > 0 ? convertToUserUnit(totalWindSpeed / forecastList.length, unit, 'speed') : 0,
     hourly: hourly,
   };
 }
+
