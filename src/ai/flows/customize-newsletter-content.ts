@@ -69,23 +69,23 @@ const CustomizeNewsletterInputSchema = z.object({
 });
 export type CustomizeNewsletterInput = z.infer<typeof CustomizeNewsletterInputSchema>;
 
-const DressMyRunItemCategoryEnum = z.enum([
-  "hat", "visor", "sunglasses", "headband", 
-  "shirt", "tank-top", "long-sleeve", "base-layer", "mid-layer", "jacket", "vest", "windbreaker", "rain-jacket",
-  "shorts", "capris", "tights", "pants",
-  "gloves", "mittens",
-  "socks",
-  "shoes", // Though typically shoes are a given, including for completeness if AI mentions it.
-  "gaiter", "balaclava",
-  "accessory" // For anything else like sunblock, reflective gear, light, etc.
-]);
-export type DressMyRunItemCategory = z.infer<typeof DressMyRunItemCategoryEnum>;
-
+// Simplified category to string for now to improve AI compliance with structure
 const DressMyRunItemSchema = z.object({
   item: z.string().describe("The specific clothing item recommended, e.g., 'Lightweight, moisture-wicking t-shirt' or 'Sunglasses'."),
-  category: DressMyRunItemCategoryEnum.describe("The general category of the clothing item. MUST be one of the predefined enum values."),
+  category: z.string().describe("The general category of the clothing item. Examples: 'hat', 'shirt', 'shorts', 'jacket', 'sunglasses', 'gloves', 'accessory'. Aim for one of these: hat, visor, sunglasses, headband, shirt, tank-top, long-sleeve, base-layer, mid-layer, jacket, vest, windbreaker, rain-jacket, shorts, capris, tights, pants, gloves, mittens, socks, shoes, gaiter, balaclava, accessory."),
 });
 export type DressMyRunItem = z.infer<typeof DressMyRunItemSchema>;
+// For UI mapping, the DressMyRunItemCategory type can still be used, but AI output schema is string.
+export type DressMyRunItemCategory = 
+  | "hat" | "visor" | "sunglasses" | "headband" 
+  | "shirt" | "tank-top" | "long-sleeve" | "base-layer" | "mid-layer" | "jacket" | "vest" | "windbreaker" | "rain-jacket"
+  | "shorts" | "capris" | "tights" | "pants"
+  | "gloves" | "mittens"
+  | "socks"
+  | "shoes"
+  | "gaiter" | "balaclava"
+  | "accessory"
+  | string; // Allow any string from AI for now
 
 const CustomizeNewsletterOutputSchema = z.object({
   greeting: z.string().describe('A friendly greeting with a running-related pun.'),
@@ -107,7 +107,7 @@ const CustomizeNewsletterOutputSchema = z.object({
     )
     .describe('An array of the top summarized and prioritized news stories.'),
   planEndNotification: z.string().optional().describe('A message to update the user profile when the plan ends.'),
-  dressMyRunSuggestion: z.array(DressMyRunItemSchema).describe('A DETAILED, ITEMIZED list of clothing recommendations based on weather at the recommended run time. Each item must have a name and a predefined category. If weather is unavailable, this should be an empty array.'),
+  dressMyRunSuggestion: z.array(DressMyRunItemSchema).describe('A DETAILED, ITEMIZED list of clothing recommendations based on weather at the recommended run time. Each item must be an object with "item" (string) and "category" (string, e.g., "shirt", "hat"). If weather is unavailable, this should be an empty array.'),
 });
 export type CustomizeNewsletterOutput = z.infer<typeof CustomizeNewsletterOutputSchema>;
 
@@ -142,6 +142,7 @@ const summarizeNewsTool = ai.defineTool({
       if (!input.articles || input.articles.length === 0) {
         return [];
       }
+      // Simple placeholder logic for the tool
       const relevantArticles = input.articles.filter(article => 
         article.title.toLowerCase().includes(input.raceDistance.toLowerCase()) || 
         article.content.toLowerCase().includes(input.runningLevel.toLowerCase())
@@ -150,7 +151,7 @@ const summarizeNewsTool = ai.defineTool({
 
       return articlesToSummarize.slice(0, 5).map((article, index) => ({
         title: article.title,
-        summary: `Summary of "${article.title.substring(0,30)}..." considering ${input.runningLevel} level for ${input.raceDistance}.`,
+        summary: `Summary of "${article.title.substring(0,30)}..." considering ${input.runningLevel} level for ${input.raceDistance}. Placeholder summary.`,
         url: article.url,
         priority: index + 1,
       }));
@@ -165,6 +166,7 @@ const generateGreetingTool = ai.defineTool({
   }),
   outputSchema: z.string().describe('The personalized greeting string, including a pun.'),
   async handler(input) { 
+    // Simple placeholder logic for the tool
     const puns = [
       "ready to hit the pavement?",
       "time to make some tracks!",
@@ -219,13 +221,14 @@ const prompt = ai.definePrompt({
   
   5. Plan end notification: If the user's training plan has ended (this information might be implicitly part of the workout or overall context), include a 'planEndNotification' message encouraging them to update their profile. Omit if no plan end is indicated.
 
-  6. Generate "Dress Your Run" suggestion as an array of objects for the 'dressMyRunSuggestion' field:
+  6. Generate "Dress Your Run" suggestion for the 'dressMyRunSuggestion' field:
+     - This field MUST be a JSON array of objects. Each object MUST have two keys: "item" (a string, e.g., "Lightweight, moisture-wicking t-shirt") and "category" (a string, e.g., "shirt", "hat", "sunglasses").
      - Act as an expert running coach providing detailed clothing advice.
      - If the weather forecast was unavailable (i.e., '{{{weather.error}}}' was present in the weather input), the 'dressMyRunSuggestion' field MUST BE an empty array [].
      - Otherwise, based on the specific weather conditions (temperature, 'feelsLike' temperature, precipitation chance 'pop', wind speed, and general description like 'sunny', 'cloudy') expected around the 'best time to run' you previously identified when generating the 'weather' field, provide a DETAILED, ITEMIZED list of clothing recommendations.
-     - Each item in the array MUST be an object with two keys: 'item' (string, e.g., "Lightweight, moisture-wicking t-shirt") and 'category' (string, MUST be one of the following exact values: "hat", "visor", "sunglasses", "headband", "shirt", "tank-top", "long-sleeve", "base-layer", "mid-layer", "jacket", "vest", "windbreaker", "rain-jacket", "shorts", "capris", "tights", "pants", "gloves", "mittens", "socks", "shoes", "gaiter", "balaclava", "accessory").
-     - Example item: { "item": "Moisture-wicking short-sleeve shirt", "category": "shirt" }
-     - Example full array for a cool morning:
+     - Use the following general categories where appropriate for the 'category' field: "hat", "visor", "sunglasses", "headband", "shirt", "tank-top", "long-sleeve", "base-layer", "mid-layer", "jacket", "vest", "windbreaker", "rain-jacket", "shorts", "capris", "tights", "pants", "gloves", "mittens", "socks", "shoes", "gaiter", "balaclava", "accessory".
+     - Example item object: { "item": "Moisture-wicking short-sleeve shirt", "category": "shirt" }
+     - Example full array output for 'dressMyRunSuggestion' for a cool morning:
        [
          { "item": "Lightweight beanie or headband", "category": "headband" },
          { "item": "Moisture-wicking long-sleeve shirt", "category": "long-sleeve" },
@@ -242,7 +245,6 @@ const prompt = ai.definePrompt({
      - Always consider 'pop' (chance of precipitation): if high, suggest a "rain-jacket" appropriate for the temperature.
      - Always consider 'windSpeed': if high, suggest a "windbreaker" or wind-resistant layer.
      - If sunny, even if cool, suggest "sunglasses".
-     - Ensure the output is a valid JSON array of these objects.
 
   User details for context and tool usage:
   - Name: {{{userName}}}
@@ -290,23 +292,20 @@ const customizeNewsletterFlow = ai.defineFlow(
         workout: fallbackWorkout,
         topStories: [], 
         planEndNotification: undefined, 
-        dressMyRunSuggestion: [], // Fallback to empty array for structured output
+        dressMyRunSuggestion: [], 
       };
     }
 
-    // Additional safeguard: ensure dressMyRunSuggestion is an array.
-    // This helps if the AI deviates from the schema despite instructions.
+    // Safeguard: ensure dressMyRunSuggestion is an array and items are somewhat valid.
     if (!Array.isArray(output.dressMyRunSuggestion)) {
-        console.warn("AI output for dressMyRunSuggestion was not an array, correcting. Received:", output.dressMyRunSuggestion);
-        // Attempt to parse if it's a stringified JSON array, otherwise default to empty array
+        console.warn("AI output for dressMyRunSuggestion was not an array, attempting to correct. Received:", output.dressMyRunSuggestion);
         if (typeof output.dressMyRunSuggestion === 'string') {
             try {
                 const parsedSuggestion = JSON.parse(output.dressMyRunSuggestion);
                 if (Array.isArray(parsedSuggestion)) {
-                    // Further validate if each item matches DressMyRunItemSchema, or just assign if basic structure is array
                     output.dressMyRunSuggestion = parsedSuggestion.filter(item => 
                         typeof item === 'object' && item !== null && 'item' in item && 'category' in item &&
-                        DressMyRunItemCategoryEnum.safeParse(item.category).success 
+                        typeof item.item === 'string' && typeof item.category === 'string'
                     );
                 } else {
                     output.dressMyRunSuggestion = [];
@@ -316,18 +315,18 @@ const customizeNewsletterFlow = ai.defineFlow(
                 output.dressMyRunSuggestion = [];
             }
         } else {
-             output.dressMyRunSuggestion = [];
+             output.dressMyRunSuggestion = []; // If not array and not string, default to empty
         }
     } else {
-        // If it is an array, filter out any non-compliant items
+        // If it is an array, filter out any non-compliant items to basic structure
         output.dressMyRunSuggestion = output.dressMyRunSuggestion.filter(item => 
-            typeof item === 'object' && item !== null && 'item' in item && 'category' in item &&
-            DressMyRunItemCategoryEnum.safeParse(item.category).success
+            typeof item === 'object' && item !== null && 
+            'item' in item && typeof item.item === 'string' &&
+            'category' in item && typeof item.category === 'string'
         );
     }
-
-
     return output;
   }
 );
 
+    
