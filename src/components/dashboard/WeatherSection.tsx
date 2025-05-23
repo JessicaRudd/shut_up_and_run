@@ -1,21 +1,24 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sun, Cloud, Zap } from "lucide-react"; // Using Zap as a generic "AI processed" weather icon
+import { Sun, Cloud, Zap, HelpCircle } from "lucide-react"; 
 
 interface WeatherSectionProps {
   location: string;
-  weatherString: string | null; // Weather description from AI
+  weatherString: string | null; // Weather description + recommendation from AI
 }
 
-// Basic icon based on keywords in the weather string
+// Basic icon based on keywords in the weather string. This is a very rough heuristic
+// as the AI's output can be quite varied.
 const getWeatherIcon = (weatherString: string | null) => {
-  if (!weatherString) return <Cloud className="mr-2 h-6 w-6 text-gray-400" />;
+  if (!weatherString) return <HelpCircle className="mr-2 h-6 w-6 text-gray-400" />;
   const lowerCondition = weatherString.toLowerCase();
   if (lowerCondition.includes("sun") || lowerCondition.includes("clear")) return <Sun className="mr-2 h-6 w-6 text-yellow-500" />;
   if (lowerCondition.includes("cloud")) return <Cloud className="mr-2 h-6 w-6 text-sky-500" />;
-  if (lowerCondition.includes("rain") || lowerCondition.includes("drizzle")) return <Zap className="mr-2 h-6 w-6 text-blue-500" />; // Using Zap to represent general weather from AI
-  if (lowerCondition.includes("snow")) return <Zap className="mr-2 h-6 w-6 text-blue-300" />;
+  if (lowerCondition.includes("rain") || lowerCondition.includes("drizzle") || lowerCondition.includes("shower")) return <Zap className="mr-2 h-6 w-6 text-blue-500" />;
+  if (lowerCondition.includes("snow")) return <Zap className="mr-2 h-6 w-6 text-blue-300" />; // Using Zap as a general AI weather icon
+  if (lowerCondition.includes("unavailable") || lowerCondition.includes("error")) return <HelpCircle className="mr-2 h-6 w-6 text-destructive" />;
   return <Zap className="mr-2 h-6 w-6 text-gray-500" />; // Default AI weather icon
 };
 
@@ -27,43 +30,32 @@ export function WeatherSection({ location, weatherString }: WeatherSectionProps)
         <CardHeader>
           <CardTitle className="flex items-center text-xl font-semibold">
             <Sun className="mr-2 h-6 w-6 text-yellow-400" />
-            Local Weather
+            Local Weather & Run Recommendation
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">Please set your location in the profile to see local weather.</p>
+          <p className="text-muted-foreground">Please set your location in the profile to see local weather and running recommendations.</p>
         </CardContent>
       </Card>
     );
   }
   
-  if (!weatherString) {
-     return (
-      <Card className="shadow-md">
-        <CardHeader>
-          <CardTitle className="flex items-center text-xl font-semibold">
-             {getWeatherIcon(null)}
-            Weather in {location}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground">Weather information is currently unavailable.</p>
-        </CardContent>
-      </Card>
-    );
-  }
+  const displayWeatherString = weatherString || "Weather information is currently being processed or is unavailable.";
 
   return (
-    <Card className="shadow-md">
+    <Card className="shadow-md min-h-[200px]"> {/* Ensure a minimum height for consistency */}
       <CardHeader>
         <CardTitle className="flex items-center text-xl font-semibold">
-          {getWeatherIcon(weatherString)}
+          {getWeatherIcon(displayWeatherString)}
           Weather in {location}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <p className="text-lg">{weatherString}</p>
-        <p className="text-xs text-muted-foreground italic mt-2">Weather summary powered by AI.</p>
+        {/* Apply whitespace-pre-line to respect newlines in AI's output */}
+        <p className="text-base whitespace-pre-line">{displayWeatherString}</p> 
+        <p className="text-xs text-muted-foreground italic pt-2">
+          Forecast details and running recommendation powered by AI using OpenWeatherMap data.
+        </p>
       </CardContent>
     </Card>
   );
