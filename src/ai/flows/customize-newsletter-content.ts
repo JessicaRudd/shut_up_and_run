@@ -169,14 +169,20 @@ const prompt = ai.definePrompt({
   
   2. Provide local weather forecast and running recommendation:
      - The input 'weather' ({{{weather}}}) contains structured daily forecast data for {{{location}}} or an error object.
-     - If '{{{weather.error}}}' exists, your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present in the input 'weather' object.
+     - If '{{{weather.error}}}' exists in the input 'weather' object, your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present.
      - Otherwise (if '{{{weather.hourly}}}' exists and '{{{weather.error}}}' does not):
-       - Create a user-friendly summary of the day's forecast based on '{{{weather.overallDescription}}}', '{{{weather.tempMin}}}', '{{{weather.tempMax}}}', '{{{weather.sunrise}}}', '{{{weather.sunset}}}', '{{{weather.humidityAvg}}}'. Mention temperatures with the user's preferred unit ('{{{weatherUnit}}}').
-       - Analyze the '{{{weather.hourly}}}' data (time, temp, feelsLike, description, pop, windSpeed) to recommend the BEST time of day to run. 
-       - Your recommendation should be specific (e.g., "around 7 AM" or "between 4 PM and 6 PM").
-       - Explain your recommendation (e.g., "to take advantage of cooler temperatures before the afternoon heat," or "to avoid the expected rain showers around noon and high winds in the evening").
-       - Consider factors like temperature (not too hot/cold), low chance of precipitation (pop), and moderate wind. Prioritize avoiding rain and extreme temperatures.
-       - Combine the forecast summary and the running recommendation into a single, informative paragraph for the 'weather' output field.
+       - For the 'weather' output field, construct a single informative paragraph. 
+       - Step 1: Present the overall daily forecast summary. This should include:
+         - Location: '{{{weather.locationName}}}'
+         - Date: '{{{weather.date}}}'
+         - General description: '{{{weather.overallDescription}}}'
+         - High and low temperatures: '{{{weather.tempMax}}}{{{weatherUnit}}}' and '{{{weather.tempMin}}}{{{weatherUnit}}}'
+         - Sunrise and sunset times: '{{{weather.sunrise}}}' and '{{{weather.sunset}}}'
+         - Average humidity: '{{{weather.humidityAvg}}}%'
+       - Step 2: Analyze the '{{{weather.hourly}}}' data (which includes 'time', 'temp', 'feelsLike', 'description', 'pop' for precipitation chance, and 'windSpeed') to recommend the BEST time of day to run.
+       - Step 3: Your recommendation should be specific (e.g., "around 7 AM" or "between 4 PM and 6 PM").
+       - Step 4: Clearly explain your recommendation, considering factors like moderate temperatures (not too hot/cold), low chance of precipitation ('pop'), and moderate wind. Prioritize avoiding rain and extreme temperatures.
+       - Combine the summary (Step 1) and the recommendation with explanation (Steps 2-4) into the single paragraph for the 'weather' output field.
        Example for good weather: "Today in {{{weather.locationName}}} ({{{weather.date}}}): {{{weather.overallDescription}}} Expect a high of {{{weather.tempMax}}}{{{weatherUnit}}} and a low of {{{weather.tempMin}}}{{{weatherUnit}}}. Sunrise is at {{{weather.sunrise}}} and sunset at {{{weather.sunset}}}. Average humidity will be around {{{weather.humidityAvg}}}%. The best time for your run looks to be around 8 AM when temperatures are pleasant (around {{{weather.hourly.[2].temp}}}{{{weatherUnit}}}) and before the chance of showers increases later in the day." (Note: hourly.[2] is just an example, you need to pick the best slot based on the data).
 
   3. Display scheduled workout: The workout for today is '{{{workout}}}'. Include this in the output.
