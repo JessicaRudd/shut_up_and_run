@@ -12,6 +12,7 @@ import { GreetingSection } from "./GreetingSection";
 import { WeatherSection } from "./WeatherSection";
 import { WorkoutSection } from "./WorkoutSection";
 import { NewsSection } from "./NewsSection";
+import { DressMyRunSection } from "./DressMyRunSection"; // Import new section
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
@@ -119,6 +120,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           <Skeleton className="h-64 w-full" /> 
           <Skeleton className="h-48 w-full" /> 
         </div>
+        <Skeleton className="h-48 w-full" /> {/* Skeleton for DressMyRunSection */}
         <Skeleton className="h-72 w-full" /> 
       </div>
     );
@@ -168,6 +170,8 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           planEndNotification={newsletterData.planEndNotification} 
         />
       </div>
+      
+      <DressMyRunSection suggestion={newsletterData.dressMyRunSuggestion} />
       
       <NewsSection topStories={newsletterData.topStories} />
     </div>

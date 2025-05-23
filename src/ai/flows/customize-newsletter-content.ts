@@ -89,6 +89,7 @@ const CustomizeNewsletterOutputSchema = z.object({
     )
     .describe('An array of the top summarized and prioritized news stories.'),
   planEndNotification: z.string().optional().describe('A message to update the user profile when the plan ends.'),
+  dressMyRunSuggestion: z.string().describe('A concise recommendation for what to wear for the run based on weather at the recommended run time.'),
 });
 export type CustomizeNewsletterOutput = z.infer<typeof CustomizeNewsletterOutputSchema>;
 
@@ -193,6 +194,13 @@ const prompt = ai.definePrompt({
   
   5. Plan end notification: If the user's training plan has ended (this information might be implicitly part of the workout or overall context), include a 'planEndNotification' message encouraging them to update their profile. Omit if no plan end is indicated.
 
+  6. Generate "Dress Your Run" suggestion:
+     - Based on the overall daily forecast AND specifically the weather conditions (temperature, 'feelsLike' temperature, wind, chance of precipitation) expected around the 'best time to run' you previously identified when generating the 'weather' field, provide a concise clothing recommendation.
+     - Consider factors like temperature ('{{{weather.hourly.[any_index_corresponding_to_best_time].temp}}}', '{{{weather.hourly.[any_index_corresponding_to_best_time].feelsLike}}}'), precipitation ('{{{weather.hourly.[any_index_corresponding_to_best_time].pop}}}'), and wind ('{{{weather.hourly.[any_index_corresponding_to_best_time].windSpeed}}}') for the specific recommended running slot. You will need to determine which hourly slot corresponds to your recommended run time.
+     - Provide practical advice. Examples: "For your run around 7 AM (feels like 10{{{weatherUnit}}}), a light jacket over a long-sleeve shirt, and leggings are advisable." or "It'll be warm (25{{{weatherUnit}}}) around your recommended 6 PM run, so a t-shirt and shorts will be great."
+     - If the weather forecast was unavailable (i.e., '{{{weather.error}}}' was present in the weather input), output "Clothing recommendations are unavailable because the weather forecast could not be retrieved." for the 'dressMyRunSuggestion' field.
+     - Keep the suggestion to one or two sentences.
+
   User details for context and tool usage:
   - Name: {{{userName}}}
   - Location: {{{location}}}
@@ -232,6 +240,7 @@ const customizeNewsletterFlow = ai.defineFlow(
       }
       
       const fallbackWorkout = input.workout || "No workout information available.";
+      const fallbackDressSuggestion = "Clothing recommendations are currently unavailable.";
       
       return {
         greeting: fallbackGreeting,
@@ -239,6 +248,7 @@ const customizeNewsletterFlow = ai.defineFlow(
         workout: fallbackWorkout,
         topStories: [], // Can't generate news without AI
         planEndNotification: undefined, 
+        dressMyRunSuggestion: fallbackDressSuggestion,
       };
     }
     return output;
