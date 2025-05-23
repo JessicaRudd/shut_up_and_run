@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Zap } from "lucide-react";
+import { Zap, CalendarDays } from "lucide-react"; // Added CalendarDays for new link
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -18,21 +18,31 @@ export function Header() {
             Shut Up and Run
           </span>
         </Link>
-        <nav className="flex items-center gap-4 text-sm">
+        <nav className="flex items-center gap-4 text-sm lg:gap-6">
           <Link
             href="/"
             className={cn(
               "transition-colors hover:text-foreground/80",
-              pathname === "/" ? "text-foreground" : "text-foreground/60"
+              pathname === "/" ? "text-foreground font-medium" : "text-foreground/60"
             )}
           >
             Dashboard
           </Link>
           <Link
+            href="/training-plan"
+            className={cn(
+              "transition-colors hover:text-foreground/80 flex items-center gap-1",
+              pathname === "/training-plan" ? "text-foreground font-medium" : "text-foreground/60"
+            )}
+          >
+            <CalendarDays className="h-4 w-4" />
+            Training Plan
+          </Link>
+          <Link
             href="/profile"
             className={cn(
               "transition-colors hover:text-foreground/80",
-              pathname === "/profile" ? "text-foreground" : "text-foreground/60"
+              pathname === "/profile" ? "text-foreground font-medium" : "text-foreground/60"
             )}
           >
             Profile

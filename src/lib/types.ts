@@ -40,3 +40,11 @@ export interface DailyForecastData {
   hourly: HourlyWeatherData[];
   error?: string; // Optional error message if fetching failed
 }
+
+export interface DatedWorkout {
+  date: Date;
+  workout: string;
+  dayOfPlan: number;
+  weekOfPlan: number;
+  isRestDay: boolean;
+}
