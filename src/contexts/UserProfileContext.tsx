@@ -13,54 +13,71 @@ interface UserProfileContextType {
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
 
+// Helper function to check profile completeness
+const checkProfileCompleteness = (profile: UserProfile | null): boolean => {
+  if (!profile) return false;
+  return !!(
+    profile.name &&
+    profile.location &&
+    profile.runningLevel &&
+    profile.trainingPlan &&
+    profile.raceDistance // Added raceDistance check
+  );
+};
+
+
 export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
   const [loading, setLoading] = useState(true);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
 
   useEffect(() => {
+    let loadedProfile = DEFAULT_USER_PROFILE;
     try {
       const storedProfile = localStorage.getItem("userProfile");
       if (storedProfile) {
         const parsedProfile = JSON.parse(storedProfile) as UserProfile;
-        setUserProfile(parsedProfile);
-        setIsProfileComplete(!!parsedProfile.name && !!parsedProfile.location && !!parsedProfile.runningLevel && !!parsedProfile.trainingPlan);
-      } else {
-        // Ensure default empty strings for levels/plans if nothing stored
-        setUserProfile(prev => ({
-          ...prev,
-          runningLevel: prev.runningLevel || '',
-          trainingPlan: prev.trainingPlan || '',
-        }));
+        // Ensure all fields from UserProfile type exist, defaulting if necessary
+        loadedProfile = {
+          ...DEFAULT_USER_PROFILE, // Start with defaults
+          ...parsedProfile, // Override with stored values
+          id: parsedProfile.id || DEFAULT_USER_PROFILE.id,
+          name: parsedProfile.name || DEFAULT_USER_PROFILE.name,
+          location: parsedProfile.location || DEFAULT_USER_PROFILE.location,
+          runningLevel: parsedProfile.runningLevel || DEFAULT_USER_PROFILE.runningLevel,
+          trainingPlan: parsedProfile.trainingPlan || DEFAULT_USER_PROFILE.trainingPlan,
+          raceDistance: parsedProfile.raceDistance || DEFAULT_USER_PROFILE.raceDistance,
+          planStartDate: parsedProfile.planStartDate, // Can be undefined
+        };
       }
     } catch (error) {
       console.error("Failed to load user profile from localStorage", error);
-      // Set to default if error
-       setUserProfile(DEFAULT_USER_PROFILE);
+      // loadedProfile remains DEFAULT_USER_PROFILE
     }
+    
+    setUserProfile(loadedProfile);
+    setIsProfileComplete(checkProfileCompleteness(loadedProfile));
     setLoading(false);
   }, []);
 
   const setUserProfileState = (profile: UserProfile) => {
-    setUserProfile(profile);
-    setIsProfileComplete(!!profile.name && !!profile.location && !!profile.runningLevel && !!profile.trainingPlan);
+    // Ensure all parts of profile are at least empty strings for consistency
+    const validatedProfile: UserProfile = {
+        ...DEFAULT_USER_PROFILE, // Base defaults
+        ...profile, // Apply incoming profile
+        id: profile.id || userProfile.id || DEFAULT_USER_PROFILE.id, // Preserve ID if possible
+    };
+    setUserProfile(validatedProfile);
+    setIsProfileComplete(checkProfileCompleteness(validatedProfile));
     try {
-      localStorage.setItem("userProfile", JSON.stringify(profile));
+      localStorage.setItem("userProfile", JSON.stringify(validatedProfile));
     } catch (error) {
       console.error("Failed to save user profile to localStorage", error);
     }
   };
   
-  // Ensure runningLevel and trainingPlan are initialized to empty strings if not set
-  const profileWithDefaults = {
-    ...userProfile,
-    runningLevel: userProfile.runningLevel || '' as RunningLevel,
-    trainingPlan: userProfile.trainingPlan || '' as TrainingPlan,
-  };
-
-
   return (
-    <UserProfileContext.Provider value={{ userProfile: profileWithDefaults, setUserProfileState, loading, isProfileComplete }}>
+    <UserProfileContext.Provider value={{ userProfile, setUserProfileState, loading, isProfileComplete }}>
       {children}
     </UserProfileContext.Provider>
   );

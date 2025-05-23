@@ -26,14 +26,14 @@ import { RUNNING_LEVELS, TRAINING_PLANS } from "@/lib/constants";
 import type { UserProfile, RunningLevel, TrainingPlan } from "@/lib/types";
 import { useEffect } from "react";
 import { toast } from "@/hooks/use-toast";
-import { v4 as uuidv4 } from 'uuid'; // Added for unique ID generation
-
+import { v4 as uuidv4 } from 'uuid';
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   location: z.string().min(2, { message: "Location is required." }),
   runningLevel: z.enum(["beginner", "intermediate", "advanced"]),
   trainingPlan: z.enum(["5k", "10k", "half-marathon", "marathon", "ultra"]),
+  raceDistance: z.string().min(1, { message: "Race distance is required (e.g., 5k, 10k, 50 miles)." }),
 });
 
 export function UserProfileForm() {
@@ -46,6 +46,7 @@ export function UserProfileForm() {
       location: "",
       runningLevel: "beginner",
       trainingPlan: "5k",
+      raceDistance: "",
     },
   });
 
@@ -56,6 +57,7 @@ export function UserProfileForm() {
         location: userProfile.location || "",
         runningLevel: userProfile.runningLevel || "beginner",
         trainingPlan: userProfile.trainingPlan || "5k",
+        raceDistance: userProfile.raceDistance || (userProfile.trainingPlan !== "ultra" ? userProfile.trainingPlan : ""),
       });
     }
   }, [loading, userProfile, form]);
@@ -67,7 +69,8 @@ export function UserProfileForm() {
       location: values.location,
       runningLevel: values.runningLevel as RunningLevel,
       trainingPlan: values.trainingPlan as TrainingPlan,
-      planStartDate: new Date().toISOString().split('T')[0], // Set plan start date to today
+      raceDistance: values.raceDistance,
+      planStartDate: userProfile.planStartDate && userProfile.trainingPlan === values.trainingPlan ? userProfile.planStartDate : new Date().toISOString().split('T')[0],
     };
     setUserProfileState(newProfile);
     toast({
@@ -77,7 +80,7 @@ export function UserProfileForm() {
   }
 
   if (loading) {
-    return <div>Loading profile...</div>; // Or a Skeleton component
+    return <div>Loading profile...</div>; 
   }
 
   return (
@@ -141,7 +144,19 @@ export function UserProfileForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Training Plan</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || undefined}>
+              <Select 
+                onValueChange={(value) => {
+                  field.onChange(value);
+                  // Auto-fill race distance if not ultra
+                  if (value !== "ultra") {
+                    form.setValue("raceDistance", value);
+                  } else if (form.getValues("raceDistance") === form.getValues("trainingPlan")) {
+                     form.setValue("raceDistance", ""); // Clear if it was auto-filled from a non-ultra plan
+                  }
+                }} 
+                defaultValue={field.value} 
+                value={field.value || undefined}
+              >
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a training plan" />
@@ -156,6 +171,20 @@ export function UserProfileForm() {
                 </SelectContent>
               </Select>
               <FormDescription>Choose a plan to follow.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="raceDistance"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Race Distance</FormLabel>
+              <FormControl>
+                <Input placeholder="e.g., 5k, 10k, 50 miles" {...field} />
+              </FormControl>
+              <FormDescription>Specify the distance you're training for (e.g., 5k, 10k, 21.1k, 42.2k, 50k, 100 miles).</FormDescription>
               <FormMessage />
             </FormItem>
           )}

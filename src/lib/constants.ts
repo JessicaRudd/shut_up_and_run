@@ -16,7 +16,8 @@ export const DEFAULT_USER_PROFILE = {
   id: '',
   name: '',
   location: '',
-  runningLevel: '',
-  trainingPlan: '',
+  runningLevel: '' as const, // Ensure it's typed correctly if empty
+  trainingPlan: '' as const, // Ensure it's typed correctly if empty
+  raceDistance: '',
   planStartDate: undefined,
 };

@@ -8,79 +8,25 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 import { Button } from "../ui/button";
 import { useEffect, useState } from "react";
+import { isPlanEndingSoon, isPlanEnded } from "@/lib/workoutUtils"; // Import from new util
 
 interface WorkoutSectionProps {
   userProfile: UserProfile | null;
+  workoutSuggestion: string | null; // From AI
+  planEndNotification?: string | null; // From AI
 }
 
-// Placeholder for workout generation logic
-const getTodaysWorkout = (profile: UserProfile): string => {
-  if (!profile.trainingPlan || !profile.runningLevel) {
-    return "Set your training plan and running level in your profile to see today's workout.";
-  }
-  const planDetails = TRAINING_PLANS.find(p => p.value === profile.trainingPlan);
-  const planName = planDetails ? planDetails.label : "your selected plan";
-  
-  // Example: vary workout by day of week (very simplified)
-  const dayOfWeek = new Date().getDay(); // Sunday = 0, Monday = 1, ...
-  switch(dayOfWeek) {
-    case 1: // Monday
-      return `Rest day or light cross-training for your ${planName}.`;
-    case 3: // Wednesday
-      return `Interval training: 6x400m at ${profile.runningLevel === 'beginner' ? 'easy' : 'moderate'} pace for your ${planName}.`;
-    case 5: // Friday
-      return `Tempo run: 20 minutes at a comfortably hard pace for your ${planName}.`;
-    default: // Other days
-      return `Easy run: 30-45 minutes at a conversational pace for your ${planName}.`;
-  }
-};
-
-const isPlanEndingSoon = (profile: UserProfile): boolean => {
-  if (!profile.planStartDate || !profile.trainingPlan) return false;
-
-  const planDetails = TRAINING_PLANS.find(p => p.value === profile.trainingPlan);
-  if (!planDetails) return false;
-
-  const startDate = new Date(profile.planStartDate);
-  const planDurationDays = planDetails.durationWeeks * 7;
-  const endDate = new Date(startDate.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
-  const today = new Date();
-  const daysRemaining = (endDate.getTime() - today.getTime()) / (1000 * 3600 * 24);
-
-  return daysRemaining <= 7 && daysRemaining >=0; // Plan ends within the next 7 days
-};
-
-const isPlanEnded = (profile: UserProfile): boolean => {
-  if (!profile.planStartDate || !profile.trainingPlan) return false;
-
-  const planDetails = TRAINING_PLANS.find(p => p.value === profile.trainingPlan);
-  if (!planDetails) return false;
-
-  const startDate = new Date(profile.planStartDate);
-  const planDurationDays = planDetails.durationWeeks * 7;
-  const endDate = new Date(startDate.getTime() + planDurationDays * 24 * 60 * 60 * 1000);
-  const today = new Date();
-  
-  return today > endDate;
-}
-
-export function WorkoutSection({ userProfile }: WorkoutSectionProps) {
-  const [workout, setWorkout] = useState<string>("Loading workout...");
-  const [planEnding, setPlanEnding] = useState<boolean>(false);
-  const [planHasEnded, setPlanHasEnded] = useState<boolean>(false);
-  const [currentDate, setCurrentDate] = useState<Date | null>(null);
+export function WorkoutSection({ userProfile, workoutSuggestion, planEndNotification }: WorkoutSectionProps) {
+  const [showLocalPlanEndingAlert, setShowLocalPlanEndingAlert] = useState<boolean>(false);
+  const [showLocalPlanEndedAlert, setShowLocalPlanEndedAlert] = useState<boolean>(false);
 
   useEffect(() => {
-    setCurrentDate(new Date()); // Ensure Date is only used client-side
+    // Check local conditions even if AI provides a notification, can be complementary
     if (userProfile) {
-      setWorkout(getTodaysWorkout(userProfile));
-      setPlanEnding(isPlanEndingSoon(userProfile));
-      setPlanHasEnded(isPlanEnded(userProfile));
-    } else {
-      setWorkout("Please complete your profile to see your workout.");
+      setShowLocalPlanEndingAlert(isPlanEndingSoon(userProfile));
+      setShowLocalPlanEndedAlert(isPlanEnded(userProfile));
     }
   }, [userProfile]);
-
 
   if (!userProfile || !userProfile.name) {
      return (
@@ -97,11 +43,8 @@ export function WorkoutSection({ userProfile }: WorkoutSectionProps) {
       </Card>
     );
   }
-  
-  if (!currentDate) { // Avoid rendering until date is set
-    return <Skeleton className="h-40 w-full" />;
-  }
 
+  const finalWorkoutText = workoutSuggestion || "Today's workout details are being prepared...";
 
   return (
     <Card className="shadow-md">
@@ -116,9 +59,19 @@ export function WorkoutSection({ userProfile }: WorkoutSectionProps) {
           </CardDescription>
         )}
       </CardHeader>
-      <CardContent>
-        <p className="text-lg mb-4">{workout}</p>
-        {planEnding && (
+      <CardContent className="space-y-4">
+        <p className="text-lg">{finalWorkoutText}</p>
+        
+        {planEndNotification && (
+          <Alert variant="default" className="bg-accent/20 border-accent text-accent-foreground">
+            <AlertTriangle className="h-5 w-5 text-accent" />
+            <AlertTitle>Training Plan Update</AlertTitle>
+            <AlertDescription>{planEndNotification}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Show local alerts if AI doesn't provide one or as additional info */}
+        {!planEndNotification && showLocalPlanEndingAlert && (
           <Alert variant="default" className="bg-accent/20 border-accent text-accent-foreground">
             <AlertTriangle className="h-5 w-5 text-accent" />
             <AlertTitle>Plan Ending Soon!</AlertTitle>
@@ -128,12 +81,12 @@ export function WorkoutSection({ userProfile }: WorkoutSectionProps) {
             </AlertDescription>
           </Alert>
         )}
-        {planHasEnded && (
-           <Alert variant="default" className="bg-primary/10 border-primary text-primary-foreground">
+        {!planEndNotification && showLocalPlanEndedAlert && (
+           <Alert variant="default" className="bg-primary/10 border-primary text-primary">
             <AlertTriangle className="h-5 w-5 text-primary" />
             <AlertTitle>Plan Completed!</AlertTitle>
-            <AlertDescription className="flex flex-col gap-2">
-              <span>Congratulations on finishing your training plan! Time to set a new goal?</span>
+            <AlertDescription className="flex flex-col gap-2 text-primary-foreground">
+              <span className="text-primary">Congratulations on finishing your training plan! Time to set a new goal?</span>
               <Button asChild size="sm" className="w-fit bg-primary hover:bg-primary/90 text-primary-foreground">
                 <Link href="/profile">Update Your Profile</Link>
               </Button>

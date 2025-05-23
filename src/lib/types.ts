@@ -7,5 +7,6 @@ export interface UserProfile {
   location: string; // e.g., "New York"
   runningLevel: RunningLevel;
   trainingPlan: TrainingPlan;
+  raceDistance: string; // e.g., "50k", "100 miles"
   planStartDate?: string; // ISO date string, e.g., "2024-07-28"
 }
