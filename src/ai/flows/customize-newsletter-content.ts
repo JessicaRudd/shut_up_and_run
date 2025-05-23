@@ -47,7 +47,7 @@ export type DailyForecastData = z.infer<typeof DailyForecastDataSchema>;
 
 const CustomizeNewsletterInputSchema = z.object({
   userName: z.string().describe('The name of the user.'),
-  location: z.string().describe('The location of the user.'), // Retained for context, even if weather object has it
+  location: z.string().describe('The location of the user.'),
   runningLevel: z.string().describe('The running level of the user (e.g., beginner, intermediate, advanced).'),
   trainingPlanType: z.string().describe('The type of training plan the user is following (e.g., 5k, 10k, half marathon, marathon).'),
   raceDistance: z.string().describe('The race distance the user is training for.'),
@@ -69,6 +69,24 @@ const CustomizeNewsletterInputSchema = z.object({
 });
 export type CustomizeNewsletterInput = z.infer<typeof CustomizeNewsletterInputSchema>;
 
+const DressMyRunItemCategoryEnum = z.enum([
+  "hat", "visor", "sunglasses", "headband", 
+  "shirt", "tank-top", "long-sleeve", "base-layer", "mid-layer", "jacket", "vest", "windbreaker", "rain-jacket",
+  "shorts", "capris", "tights", "pants",
+  "gloves", "mittens",
+  "socks",
+  "shoes", // Though typically shoes are a given, including for completeness if AI mentions it.
+  "gaiter", "balaclava",
+  "accessory" // For anything else like sunblock, reflective gear, light, etc.
+]);
+export type DressMyRunItemCategory = z.infer<typeof DressMyRunItemCategoryEnum>;
+
+const DressMyRunItemSchema = z.object({
+  item: z.string().describe("The specific clothing item recommended, e.g., 'Lightweight, moisture-wicking t-shirt' or 'Sunglasses'."),
+  category: DressMyRunItemCategoryEnum.describe("The general category of the clothing item. MUST be one of the predefined enum values."),
+});
+export type DressMyRunItem = z.infer<typeof DressMyRunItemSchema>;
+
 const CustomizeNewsletterOutputSchema = z.object({
   greeting: z.string().describe('A friendly greeting with a running-related pun.'),
   weather: z.string().describe("A user-friendly summary of the day's local weather forecast, including a recommendation for the best time to run based on the provided hourly data. If weather data is unavailable or an error occurred, this should state so clearly and include the specific error message."),
@@ -89,7 +107,7 @@ const CustomizeNewsletterOutputSchema = z.object({
     )
     .describe('An array of the top summarized and prioritized news stories.'),
   planEndNotification: z.string().optional().describe('A message to update the user profile when the plan ends.'),
-  dressMyRunSuggestion: z.string().describe('A detailed, itemized recommendation for what to wear for the run based on weather at the recommended run time. Should list specific items like "hat, sunglasses, t-shirt, shorts".'),
+  dressMyRunSuggestion: z.array(DressMyRunItemSchema).describe('A DETAILED, ITEMIZED list of clothing recommendations based on weather at the recommended run time. Each item must have a name and a predefined category. If weather is unavailable, this should be an empty array.'),
 });
 export type CustomizeNewsletterOutput = z.infer<typeof CustomizeNewsletterOutputSchema>;
 
@@ -124,7 +142,6 @@ const summarizeNewsTool = ai.defineTool({
       if (!input.articles || input.articles.length === 0) {
         return [];
       }
-      // Enhanced placeholder handler
       const relevantArticles = input.articles.filter(article => 
         article.title.toLowerCase().includes(input.raceDistance.toLowerCase()) || 
         article.content.toLowerCase().includes(input.runningLevel.toLowerCase())
@@ -178,7 +195,7 @@ const prompt = ai.definePrompt({
   
   2. Provide local weather forecast and running recommendation:
      - The input 'weather' ({{{weather}}}) contains structured daily forecast data for {{{location}}} or an error object.
-     - If '{{{weather.error}}}' exists in the input 'weather' object, your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present. In this error case, the 'dressMyRunSuggestion' field should also indicate unavailability due to weather.
+     - If '{{{weather.error}}}' exists in the input 'weather' object, your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present. In this error case, the 'dressMyRunSuggestion' field should be an empty array.
      - Otherwise (if '{{{weather.hourly}}}' exists and '{{{weather.error}}}' does not):
        - For the 'weather' output field, construct a single informative paragraph. 
        - Step 1: Present the overall daily forecast summary. This should include:
@@ -202,26 +219,30 @@ const prompt = ai.definePrompt({
   
   5. Plan end notification: If the user's training plan has ended (this information might be implicitly part of the workout or overall context), include a 'planEndNotification' message encouraging them to update their profile. Omit if no plan end is indicated.
 
-  6. Generate "Dress Your Run" suggestion:
+  6. Generate "Dress Your Run" suggestion as an array of objects for the 'dressMyRunSuggestion' field:
      - Act as an expert running coach providing detailed clothing advice.
-     - If the weather forecast was unavailable (i.e., '{{{weather.error}}}' was present in the weather input), output "Clothing recommendations are unavailable because the weather forecast could not be retrieved." for the 'dressMyRunSuggestion' field.
-     - Otherwise, based on the specific weather conditions (temperature, 'feelsLike' temperature, precipitation chance 'pop', wind speed, and general description like 'sunny', 'cloudy') expected around the 'best time to run' you previously identified when generating the 'weather' field, provide a DETAILED, ITEMIZED clothing recommendation.
-     - You must suggest specific types of clothing items. For example: "For your run around 7 AM (feels like 10{{{weatherUnit}}}, partly cloudy, 10% chance of rain, 5 mph wind):
-        - Top: Lightweight, moisture-wicking long-sleeve shirt.
-        - Bottoms: Running tights or leggings.
-        - Head: Light beanie or headband.
-        - Hands: Light gloves.
-        - Optional: A light, packable windbreaker if you are sensitive to wind."
+     - If the weather forecast was unavailable (i.e., '{{{weather.error}}}' was present in the weather input), the 'dressMyRunSuggestion' field MUST BE an empty array [].
+     - Otherwise, based on the specific weather conditions (temperature, 'feelsLike' temperature, precipitation chance 'pop', wind speed, and general description like 'sunny', 'cloudy') expected around the 'best time to run' you previously identified when generating the 'weather' field, provide a DETAILED, ITEMIZED list of clothing recommendations.
+     - Each item in the array MUST be an object with two keys: 'item' (string, e.g., "Lightweight, moisture-wicking t-shirt") and 'category' (string, MUST be one of the following exact values: "hat", "visor", "sunglasses", "headband", "shirt", "tank-top", "long-sleeve", "base-layer", "mid-layer", "jacket", "vest", "windbreaker", "rain-jacket", "shorts", "capris", "tights", "pants", "gloves", "mittens", "socks", "shoes", "gaiter", "balaclava", "accessory").
+     - Example item: { "item": "Moisture-wicking short-sleeve shirt", "category": "shirt" }
+     - Example full array for a cool morning:
+       [
+         { "item": "Lightweight beanie or headband", "category": "headband" },
+         { "item": "Moisture-wicking long-sleeve shirt", "category": "long-sleeve" },
+         { "item": "Running tights or leggings", "category": "tights" },
+         { "item": "Light gloves", "category": "gloves" },
+         { "item": "Possibly a light, packable windbreaker", "category": "windbreaker" }
+       ]
      - Consider different temperature ranges to guide your suggestions:
-        - Hot (>25°C / 77°F): Suggest items like a tank top or very light short-sleeve shirt, light shorts, sunglasses, sun-protective hat/visor.
-        - Warm (15-25°C / 59-77°F): Suggest items like a short-sleeve t-shirt, shorts or capris. Maybe a light vest if windy.
-        - Mild/Cool (5-15°C / 41-59°F): Suggest items like a long-sleeve base layer, possibly a light jacket or vest (especially if windy/rainy), tights or running pants. Light gloves/headband for cooler end.
-        - Cold (-5 to 5°C / 23-41°F): Suggest items like a thermal base layer, an insulating mid-layer (fleece/light jacket), possibly a wind/water-resistant outer shell, thermal tights, hat covering ears, gloves/mittens.
-        - Very Cold (< -5°C / < 23°F): Suggest multiple layers (wicking base, insulating mid, protective outer), warm hat, neck gaiter/balaclava, warm gloves/mittens, windproof thermal tights.
-     - Always consider 'pop' (chance of precipitation): if high, suggest a water-resistant or waterproof jacket appropriate for the temperature.
-     - Always consider 'windSpeed': if high, suggest a windbreaker or wind-resistant layer.
-     - If sunny, even if cool, suggest sunglasses.
-     - Keep the suggestion concise but ensure it's a list of specific items. The output should be a single string, use newlines for itemization if helpful for readability in the final display.
+        - Hot (>25°C / 77°F): Suggest items like a tank top or very light short-sleeve shirt, light shorts, sunglasses, sun-protective hat/visor. Categories: "tank-top", "shorts", "sunglasses", "hat", "visor".
+        - Warm (15-25°C / 59-77°F): Suggest items like a short-sleeve t-shirt, shorts or capris. Maybe a light vest if windy. Categories: "shirt", "shorts", "capris", "vest".
+        - Mild/Cool (5-15°C / 41-59°F): Suggest items like a long-sleeve base layer, possibly a light jacket or vest (especially if windy/rainy), tights or running pants. Light gloves/headband for cooler end. Categories: "long-sleeve", "base-layer", "jacket", "vest", "tights", "pants", "gloves", "headband".
+        - Cold (-5 to 5°C / 23-41°F): Suggest items like a thermal base layer, an insulating mid-layer (fleece/light jacket), possibly a wind/water-resistant outer shell, thermal tights, hat covering ears, gloves/mittens. Categories: "base-layer", "mid-layer", "jacket", "tights", "hat", "gloves", "mittens".
+        - Very Cold (< -5°C / < 23°F): Suggest multiple layers (wicking base, insulating mid, protective outer), warm hat, neck gaiter/balaclava, warm gloves/mittens, windproof thermal tights. Categories: "base-layer", "mid-layer", "jacket", "hat", "gaiter", "balaclava", "gloves", "mittens", "tights".
+     - Always consider 'pop' (chance of precipitation): if high, suggest a "rain-jacket" appropriate for the temperature.
+     - Always consider 'windSpeed': if high, suggest a "windbreaker" or wind-resistant layer.
+     - If sunny, even if cool, suggest "sunglasses".
+     - Ensure the output is a valid JSON array of these objects.
 
   User details for context and tool usage:
   - Name: {{{userName}}}
@@ -252,19 +273,13 @@ const customizeNewsletterFlow = ai.defineFlow(
       
       const fallbackGreeting = `Hello ${input.userName}, have a great run!`;
       let fallbackWeather: string;
-      let fallbackDressSuggestion = "Clothing recommendations are currently unavailable.";
-
-      // Check if input.weather itself is an error object or DailyForecastData with an error property
+      
       const weatherHasError = typeof input.weather === 'object' && input.weather && 'error' in input.weather && typeof input.weather.error === 'string' && input.weather.error.length > 0;
 
       if (weatherHasError) {
         fallbackWeather = `Weather forecast for ${input.location} is currently unavailable: ${input.weather.error}`;
-        fallbackDressSuggestion = `Clothing recommendations are unavailable because the weather forecast could not be retrieved: ${input.weather.error}`;
       } else {
-        // Weather data was good, but AI failed.
         fallbackWeather = `Could not generate weather summary for ${input.location} at this time. Please try again later.`;
-        // Dress suggestion also reflects AI failure with good weather data
-        fallbackDressSuggestion = `Could not generate clothing recommendations for ${input.location} at this time. Please try again later.`;
       }
       
       const fallbackWorkout = input.workout || "No workout information available.";
@@ -275,9 +290,43 @@ const customizeNewsletterFlow = ai.defineFlow(
         workout: fallbackWorkout,
         topStories: [], 
         planEndNotification: undefined, 
-        dressMyRunSuggestion: fallbackDressSuggestion,
+        dressMyRunSuggestion: [], // Fallback to empty array for structured output
       };
     }
+
+    // Additional safeguard: ensure dressMyRunSuggestion is an array.
+    // This helps if the AI deviates from the schema despite instructions.
+    if (!Array.isArray(output.dressMyRunSuggestion)) {
+        console.warn("AI output for dressMyRunSuggestion was not an array, correcting. Received:", output.dressMyRunSuggestion);
+        // Attempt to parse if it's a stringified JSON array, otherwise default to empty array
+        if (typeof output.dressMyRunSuggestion === 'string') {
+            try {
+                const parsedSuggestion = JSON.parse(output.dressMyRunSuggestion);
+                if (Array.isArray(parsedSuggestion)) {
+                    // Further validate if each item matches DressMyRunItemSchema, or just assign if basic structure is array
+                    output.dressMyRunSuggestion = parsedSuggestion.filter(item => 
+                        typeof item === 'object' && item !== null && 'item' in item && 'category' in item &&
+                        DressMyRunItemCategoryEnum.safeParse(item.category).success 
+                    );
+                } else {
+                    output.dressMyRunSuggestion = [];
+                }
+            } catch (e) {
+                console.error("Could not parse string dressMyRunSuggestion from AI into array:", e);
+                output.dressMyRunSuggestion = [];
+            }
+        } else {
+             output.dressMyRunSuggestion = [];
+        }
+    } else {
+        // If it is an array, filter out any non-compliant items
+        output.dressMyRunSuggestion = output.dressMyRunSuggestion.filter(item => 
+            typeof item === 'object' && item !== null && 'item' in item && 'category' in item &&
+            DressMyRunItemCategoryEnum.safeParse(item.category).success
+        );
+    }
+
+
     return output;
   }
 );
