@@ -69,12 +69,12 @@ export function UserProfileForm() {
     defaultValues: {
       name: "",
       location: "",
-      runningLevel: DEFAULT_USER_PROFILE.runningLevel, // Use default from constants
-      trainingPlan: DEFAULT_USER_PROFILE.trainingPlan, // Use default from constants
+      runningLevel: undefined, // Intentionally undefined, will be set by useEffect
+      trainingPlan: undefined, // Intentionally undefined, will be set by useEffect
       planStartDate: undefined,
       raceDate: undefined,
-      weatherUnit: DEFAULT_USER_PROFILE.weatherUnit,
-      newsletterDelivery: DEFAULT_USER_PROFILE.newsletterDelivery,
+      weatherUnit: DEFAULT_USER_PROFILE.weatherUnit, // Context ensures this is valid
+      newsletterDelivery: DEFAULT_USER_PROFILE.newsletterDelivery, // Context ensures this is valid
     },
   });
 
@@ -106,30 +106,26 @@ export function UserProfileForm() {
 
   useEffect(() => {
     if (!loading && userProfile) {
+      // userProfile from context is guaranteed to have valid, non-empty enum strings
+      // for runningLevel, trainingPlan, weatherUnit, newsletterDelivery due to context logic.
       let planStartDateForForm = userProfile.planStartDate;
       if (userProfile.raceDate && userProfile.trainingPlan) {
         planStartDateForForm = calculatePlanStartDate(userProfile.raceDate, userProfile.trainingPlan) || userProfile.planStartDate;
       }
 
-      // Ensure values for Selects are definitely among the valid options
-      const validRunningLevel = RUNNING_LEVELS.find(rl => rl.value === userProfile.runningLevel)?.value || DEFAULT_USER_PROFILE.runningLevel;
-      const validTrainingPlan = TRAINING_PLANS.find(tp => tp.value === userProfile.trainingPlan)?.value || DEFAULT_USER_PROFILE.trainingPlan;
-      const validWeatherUnit = WEATHER_UNITS.find(wu => wu.value === userProfile.weatherUnit)?.value || DEFAULT_USER_PROFILE.weatherUnit;
-      const validNewsletterDelivery = NEWSLETTER_DELIVERY_OPTIONS.find(nd => nd.value === userProfile.newsletterDelivery)?.value || DEFAULT_USER_PROFILE.newsletterDelivery;
-
-
       form.reset({
-        name: userProfile.name,
-        location: userProfile.location,
-        runningLevel: validRunningLevel,
-        trainingPlan: validTrainingPlan,
+        name: userProfile.name || "", // Ensure inputs get strings
+        location: userProfile.location || "", // Ensure inputs get strings
+        runningLevel: userProfile.runningLevel, // Directly from context (e.g., "beginner")
+        trainingPlan: userProfile.trainingPlan, // Directly from context (e.g., "5k")
         planStartDate: planStartDateForForm,
         raceDate: userProfile.raceDate,
-        weatherUnit: validWeatherUnit,
-        newsletterDelivery: validNewsletterDelivery,
+        weatherUnit: userProfile.weatherUnit,
+        newsletterDelivery: userProfile.newsletterDelivery,
       });
     }
-  }, [loading, userProfile, form, calculatePlanStartDate]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, userProfile, calculatePlanStartDate]); // `form` is stable, no need to include
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     let finalPlanStartDate = values.planStartDate;
@@ -137,7 +133,6 @@ export function UserProfileForm() {
     if (values.raceDate && values.trainingPlan) {
       finalPlanStartDate = calculatePlanStartDate(values.raceDate, values.trainingPlan as TrainingPlanType);
     } else if (!values.raceDate && !values.planStartDate) {
-      // If no race date and no plan start date, default plan start date to today
       finalPlanStartDate = format(new Date(), "yyyy-MM-dd");
     }
 
@@ -174,7 +169,7 @@ export function UserProfileForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Name</FormLabel>
-              <FormControl><Input placeholder="Your Name" {...field} /></FormControl>
+              <FormControl><Input placeholder="Your Name" {...field} value={field.value || ""} /></FormControl>
               <FormDescription>This is your public display name.</FormDescription>
               <FormMessage />
             </FormItem>
@@ -186,7 +181,7 @@ export function UserProfileForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Location (City)</FormLabel>
-              <FormControl><Input placeholder="e.g., Springfield" {...field} /></FormControl>
+              <FormControl><Input placeholder="e.g., Springfield" {...field} value={field.value || ""} /></FormControl>
               <FormDescription>Used for local weather information.</FormDescription>
               <FormMessage />
             </FormItem>
@@ -227,7 +222,6 @@ export function UserProfileForm() {
                        form.setValue("planStartDate", newPlanStartDate, { shouldValidate: true });
                      }
                   } else if (!currentRaceDate) {
-                     // If no race date, and user changes plan, or planStartDate is not set, default planStartDate to today
                      if (!form.getValues("planStartDate") || (userProfile && userProfile.trainingPlan !== selectedPlanValue)) {
                          form.setValue("planStartDate", format(new Date(), "yyyy-MM-dd"), { shouldValidate: true });
                     }
@@ -285,7 +279,6 @@ export function UserProfileForm() {
                           form.setValue("planStartDate", newPlanStartDate, { shouldValidate: true });
                         }
                       } else if (!newRaceDate) {
-                        // If race date is cleared, set plan start date based on whether it's already set or default to today
                         const existingPlanStartDate = form.getValues("planStartDate");
                         form.setValue("planStartDate", existingPlanStartDate || format(new Date(), "yyyy-MM-dd") , { shouldValidate: true });
                       }
@@ -395,3 +388,4 @@ export function UserProfileForm() {
     </Form>
   );
 }
+
