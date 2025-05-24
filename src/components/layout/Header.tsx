@@ -56,8 +56,7 @@ export function Header() {
             size="sm" 
             className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
           >
-            <Link href="https://www.buymeacoffee.com/studio" target="_blank" rel="noopener noreferrer">
-              {/* Removed Coffee icon, text changed */}
+            <Link href="https://buymeacoffee.com/h9aq9muuyz" target="_blank" rel="noopener noreferrer">
               Buy Me A Coffee
             </Link>
           </Button>
