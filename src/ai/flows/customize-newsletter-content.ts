@@ -139,7 +139,7 @@ const prompt = ai.definePrompt({
   prompt: `You are a personalized newsletter generator for runners for Shut Up and Run. You will generate a newsletter based on the user's preferences, training plan, and daily weather forecast.
 
   Your response MUST be in JSON format, adhering to the defined output schema. 
-  The 'topStories' field must contain a maximum of 5 articles.
+  The 'topStories' field must contain exactly 5 articles.
   If the 'fetchGoogleRunningNewsTool' returns an error or no articles, then the 'topStories' field in your JSON output MUST be an empty array ([]). Do not invent news stories.
 
   Tasks to perform:
@@ -147,7 +147,7 @@ const prompt = ai.definePrompt({
 
   2. Provide local weather forecast and running recommendation:
      - The input 'weather' ({{{weather}}}) contains structured daily forecast data for {{{location}}} or an error object.
-     - If '{{{weather.error}}}' exists in the input 'weather' object (e.g., { "error": "City not found" } ), your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present. In this error case, the 'dressMyRunSuggestion' field should be an empty array.
+     // - If '{{{weather.error}}}' exists in the input 'weather' object (e.g., { "error": "City not found" } ), your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present. In this error case, the 'dressMyRunSuggestion' field should be an empty array.
      - Otherwise (if '{{{weather.hourly}}}' exists and '{{{weather.error}}}' does not):
        - For the 'weather' output field, construct a single informative paragraph following these steps:
        - Step 1: Present the overall daily forecast summary. This should include: Location: '{{{weather.locationName}}}', Date: '{{{weather.date}}}', General description: '{{{weather.overallDescription}}}', High and low temperatures: '{{{weather.tempMax}}}{{{weatherUnit}}}' and '{{{weather.tempMin}}}{{{weatherUnit}}}', Sunrise and sunset times: '{{{weather.sunrise}}}' and '{{{weather.sunset}}}', Average humidity: '{{{weather.humidityAvg}}}%'.
@@ -164,7 +164,7 @@ const prompt = ai.definePrompt({
      - From the articles returned by the tool, select up to 5 of the most relevant and interesting stories for the user.
      - For each selected story, provide a concise summary based on its snippet.
      - Assign a priority (1=highest) to each selected story.
-     - CRITICAL: If the 'fetchGoogleRunningNewsTool' returns an error or its 'articles' array is empty, the 'topStories' field in your JSON output MUST be an empty array ([]). Do NOT generate placeholder or fake news. Ensure no more than 5 stories are returned in the final output.
+     - CRITICAL: If the 'fetchGoogleRunningNewsTool' returns an error or its 'articles' array is empty, the 'topStories' field in your JSON output MUST be an empty array ([]). Do NOT generate placeholder or fake news. Ensure exactly 5 stories are returned in the final output.
 
   5. Plan end notification: If the user's training plan has ended (indicated by the workout text), include a 'planEndNotification' message. Omit if no plan end is indicated.
 
@@ -196,6 +196,7 @@ const customizeNewsletterFlow = ai.defineFlow(
     outputSchema: CustomizeNewsletterOutputSchema,
   },
   async (input: CustomizeNewsletterInput): Promise<CustomizeNewsletterOutput> => {
+    console.log("[customizeNewsletterFlow] Input received by the flow:", JSON.stringify(input, null, 2));
     console.log("[customizeNewsletterFlow] Received input:", JSON.stringify(input, null, 2));
     const {output} = await prompt(input);
 
@@ -226,6 +227,7 @@ const customizeNewsletterFlow = ai.defineFlow(
       return fallbackResult;
     }
     console.log("[customizeNewsletterFlow] AI prompt produced output:", JSON.stringify(output, null, 2));
+    console.log("[customizeNewsletterFlow] Raw output from prompt:", JSON.stringify(output, null, 2));
 
 
     // Safeguard for topStories
@@ -262,7 +264,7 @@ const customizeNewsletterFlow = ai.defineFlow(
         output.dressMyRunSuggestion = [];
     }
     
-    console.log("[customizeNewsletterFlow] Returning processed output:", output);
+    console.log("[customizeNewsletterFlow] Returning processed output:", JSON.stringify(output, null, 2));
     return output;
   }
 );
