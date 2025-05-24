@@ -4,17 +4,26 @@ export type TrainingPlan = "5k" | "10k" | "half-marathon" | "marathon" | "ultra"
 export type WeatherUnit = "C" | "F" | "";
 export type NewsletterDelivery = "email" | "hangouts" | "";
 
+export type NewsSearchCategory = 
+  | "geographic_area" 
+  | "track_road_trail" 
+  | "running_tech" 
+  | "running_apparel" 
+  | "marathon_majors" 
+  | "nutrition" 
+  | "training";
+
 export interface UserProfile {
   id: string;
   name: string;
   location: string; // e.g., "New York"
   runningLevel: RunningLevel;
   trainingPlan: TrainingPlan;
-  // raceDistance: string; // Removed - will be inferred from trainingPlan for AI context
-  planStartDate?: string; // ISO date string, e.g., "2024-07-28". This is the *effective* start date.
+  planStartDate?: string; // ISO date string, e.g., "2024-07-28".
   raceDate?: string; // ISO date string, e.g., "2024-10-20"
   weatherUnit: WeatherUnit;
   newsletterDelivery: NewsletterDelivery;
+  newsSearchPreferences?: NewsSearchCategory[];
 }
 
 // New types for structured weather forecast
@@ -51,4 +60,3 @@ export interface DatedWorkout {
   isRestDay: boolean;
   isRaceDay?: boolean; // Added for race day identification
 }
-

@@ -1,8 +1,8 @@
 
 "use client";
 
-import type { UserProfile, RunningLevel, TrainingPlan, WeatherUnit, NewsletterDelivery } from "@/lib/types";
-import { DEFAULT_USER_PROFILE, RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS } from "@/lib/constants";
+import type { UserProfile, RunningLevel, TrainingPlan, WeatherUnit, NewsletterDelivery, NewsSearchCategory } from "@/lib/types";
+import { DEFAULT_USER_PROFILE, RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS, NEWS_SEARCH_CATEGORIES } from "@/lib/constants";
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
 interface UserProfileContextType {
@@ -18,11 +18,12 @@ const UserProfileContext = createContext<UserProfileContextType | undefined>(und
 const checkProfileCompleteness = (profile: UserProfile | null): boolean => {
   if (!profile) return false;
   // RaceDate is optional. PlanStartDate is also optional but often derived or defaulted.
+  // newsSearchPreferences are optional.
   return !!(
     profile.name &&
     profile.location &&
-    profile.runningLevel && // This will be false if profile.runningLevel is ""
-    profile.trainingPlan && // This will be false if profile.trainingPlan is ""
+    profile.runningLevel && 
+    profile.trainingPlan && 
     profile.weatherUnit &&
     profile.newsletterDelivery
   );
@@ -42,10 +43,9 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
         const storedProfile = JSON.parse(storedProfileJson) as Partial<UserProfile>;
         
         profileToSet = {
-          ...DEFAULT_USER_PROFILE, // Start with defaults
-          ...storedProfile,        // Override with stored values that are present
+          ...DEFAULT_USER_PROFILE, 
+          ...storedProfile,        
           
-          // Explicitly validate/coerce enums that might be invalid from old storage or missing
           runningLevel: RUNNING_LEVELS.find(rl => rl.value === storedProfile.runningLevel)
                           ? storedProfile.runningLevel! 
                           : DEFAULT_USER_PROFILE.runningLevel,
@@ -58,13 +58,14 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
           newsletterDelivery: NEWSLETTER_DELIVERY_OPTIONS.find(nd => nd.value === storedProfile.newsletterDelivery)
                           ? storedProfile.newsletterDelivery!
                           : DEFAULT_USER_PROFILE.newsletterDelivery,
-          // Ensure id is preserved from storedProfile if it exists, otherwise from DEFAULT_USER_PROFILE
+          newsSearchPreferences: Array.isArray(storedProfile.newsSearchPreferences)
+                          ? storedProfile.newsSearchPreferences.filter(pref => NEWS_SEARCH_CATEGORIES.some(cat => cat.value === pref))
+                          : DEFAULT_USER_PROFILE.newsSearchPreferences,
           id: storedProfile.id || DEFAULT_USER_PROFILE.id,
         };
       }
     } catch (error) {
       console.error("Failed to load user profile from localStorage", error);
-      // profileToSet remains DEFAULT_USER_PROFILE
     }
     
     setUserProfile(profileToSet);
@@ -73,16 +74,14 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const setUserProfileState = (profileChanges: Partial<UserProfile>) => {
-    // Merge changes with current profile, then validate and save
     const newProfileCandidate = {
-      ...userProfile, // Current state as base
-      ...profileChanges // Apply incoming changes
+      ...userProfile, 
+      ...profileChanges 
     };
 
     const validatedProfile: UserProfile = {
-      ...DEFAULT_USER_PROFILE, // Base defaults for any missing fields
-      ...newProfileCandidate,  // Merged profile
-      // Re-validate enums and ensure ID is correctly handled
+      ...DEFAULT_USER_PROFILE, 
+      ...newProfileCandidate,  
       id: newProfileCandidate.id || DEFAULT_USER_PROFILE.id,
       runningLevel: RUNNING_LEVELS.find(rl => rl.value === newProfileCandidate.runningLevel) 
                       ? newProfileCandidate.runningLevel 
@@ -96,6 +95,9 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
       newsletterDelivery: NEWSLETTER_DELIVERY_OPTIONS.find(nd => nd.value === newProfileCandidate.newsletterDelivery)
                       ? newProfileCandidate.newsletterDelivery
                       : DEFAULT_USER_PROFILE.newsletterDelivery,
+      newsSearchPreferences: Array.isArray(newProfileCandidate.newsSearchPreferences)
+                      ? newProfileCandidate.newsSearchPreferences.filter(pref => NEWS_SEARCH_CATEGORIES.some(cat => cat.value === pref))
+                      : DEFAULT_USER_PROFILE.newsSearchPreferences,
     };
 
     setUserProfile(validatedProfile);

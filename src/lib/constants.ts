@@ -1,4 +1,6 @@
 
+import type { NewsSearchCategory } from "./types";
+
 export const RUNNING_LEVELS = [
   { value: "beginner", label: "Beginner" },
   { value: "intermediate", label: "Intermediate" },
@@ -23,6 +25,16 @@ export const NEWSLETTER_DELIVERY_OPTIONS = [
   { value: "hangouts", label: "Google Hangout Alert" },
 ];
 
+export const NEWS_SEARCH_CATEGORIES: { value: NewsSearchCategory; label: string }[] = [
+  { value: "geographic_area", label: "News in my Area" },
+  { value: "track_road_trail", label: "Track/Road/Trail News" },
+  { value: "running_tech", label: "Running Tech" },
+  { value: "running_apparel", label: "Running Apparel" },
+  { value: "marathon_majors", label: "Marathon Majors" },
+  { value: "nutrition", label: "Nutrition & Hydration" },
+  { value: "training", label: "Training Tips & Strategies" },
+];
+
 export const DEFAULT_USER_PROFILE = {
   id: '',
   name: '',
@@ -33,20 +45,12 @@ export const DEFAULT_USER_PROFILE = {
   raceDate: undefined,
   weatherUnit: "F" as const,
   newsletterDelivery: "email" as const,
+  newsSearchPreferences: [] as NewsSearchCategory[],
 };
 
-export const RSS_FEED_URLS: string[] = [
-  'https://hungryrunnergirl.com/feed?x=1',
-  'https://www.irunfar.com/feed',
-  'https://lauranorrisrunning.com/feed/',
-  'https://www.dcrainmaker.com/feed',
-  'http://www.carleemcdot.com/feeds/posts/default', // Note: HTTP, might have issues in some environments
-  'http://feeds.feedburner.com/AliOnTheRun' // Note: HTTP, might have issues in some environments
-];
-
-// For AI flow, structure for news article input
-export type NewsArticleAIInput = {
+// For AI flow, structure for news article input (from Google Search tool)
+export type NewsArticleFromTool = {
   title: string;
-  url: string;
-  content: string; // This will be the snippet/description from RSS
+  link: string;
+  snippet: string; // Snippet from Google Search
 };

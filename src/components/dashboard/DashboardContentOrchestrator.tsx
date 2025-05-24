@@ -6,8 +6,8 @@ import type { UserProfile, DailyForecastData } from "@/lib/types";
 import { customizeNewsletter, type CustomizeNewsletterOutput, type CustomizeNewsletterInput } from "@/ai/flows/customize-newsletter-content";
 import { getTodaysWorkout } from "@/lib/workoutUtils";
 import { getWeatherByLocation } from "@/services/weatherService"; 
-import { fetchAndParseRSSFeeds } from "@/services/newsService"; 
-import { RSS_FEED_URLS, type NewsArticleAIInput } from "@/lib/constants"; 
+// Removed: import { fetchAndParseRSSFeeds } from "@/services/newsService"; 
+// Removed: import { RSS_FEED_URLS, type NewsArticleAIInput } from "@/lib/constants"; 
 
 import { GreetingSection } from "./GreetingSection";
 import { WeatherSection } from "./WeatherSection";
@@ -29,6 +29,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weatherErrorForAI, setWeatherErrorForAI] = useState<string | null>(null);
+  // Removed newsError state as news fetching is now part of the AI tool
   const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null);
 
 
@@ -37,7 +38,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
       setLoading(false);
       setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
       setNewsletterData(null);
-      setLastFetchedDate(null); // Reset fetch date if profile is incomplete
+      setLastFetchedDate(null); 
       return;
     }
 
@@ -66,15 +67,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
         }
       }
 
-      let fetchedArticles: NewsArticleAIInput[] = [];
-      try {
-        fetchedArticles = await fetchAndParseRSSFeeds(RSS_FEED_URLS);
-        if (fetchedArticles.length === 0) {
-          console.warn("No articles fetched from RSS feeds. AI will receive empty news list.");
-        }
-      } catch (newsError: any) {
-        console.error("Error fetching news articles:", newsError);
-      }
+      // RSS feed fetching is removed here. News fetching is now handled by a Genkit tool.
       
       let derivedRaceDistance = "General Fitness";
       if (userProfile.trainingPlan) {
@@ -93,16 +86,17 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
         trainingPlanType: userProfile.trainingPlan || "5k",
         raceDistance: derivedRaceDistance,
         workout: todaysWorkout,
-        newsStories: fetchedArticles, 
+        // newsStories is removed from input; AI tool will fetch news
         weather: weatherInputForAI,
         weatherUnit: userProfile.weatherUnit || "F", 
+        newsSearchPreferences: userProfile.newsSearchPreferences || [], // Pass news preferences
       };
       
       const result = await customizeNewsletter(input);
       setNewsletterData(result);
       setLastFetchedDate(currentDateStr);
     } catch (err: any) {
-      console.error("Error fetching personalized newsletter data, weather or news:", err);
+      console.error("Error fetching personalized newsletter data:", err);
       let errorMessage = "Could not load your personalized dashboard. ";
       if (err.message) {
         errorMessage += err.message;
@@ -111,8 +105,8 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
       } else {
         errorMessage += "An unknown error occurred."
       }
-      if (weatherErrorForAI && (err.message?.toLowerCase().includes('ai') || err.message?.toLowerCase().includes('flow'))) {
-          setError(`Failed to process weather data: ${weatherErrorForAI}. Details: ${errorMessage}`);
+      if (weatherErrorForAI && (err.message?.toLowerCase().includes('ai') || err.message?.toLowerCase().includes('flow') || err.message?.toLowerCase().includes('tool'))) {
+          setError(`Failed to process data (potentially weather or news tool): ${weatherErrorForAI || err.message}. Details: ${errorMessage}`);
       } else {
           setError(errorMessage);
       }
@@ -120,21 +114,19 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userProfile]); // Removed newsletterData, lastFetchedDate to avoid re-trigger loop if fetchNewsletterDataCallback itself changes identity
+  }, [userProfile]); 
 
   useEffect(() => {
     const todayStr = format(new Date(), "yyyy-MM-dd");
     if (!newsletterData || lastFetchedDate !== todayStr) {
-      if (userProfile.name && userProfile.location && userProfile.weatherUnit) { // Only fetch if profile is minimally complete
+      if (userProfile.name && userProfile.location && userProfile.weatherUnit) { 
          fetchNewsletterDataCallback(todayStr);
       } else {
-        // If profile becomes incomplete after having data, clear it
         if (newsletterData) { 
             setNewsletterData(null);
-            setLoading(false); // Not loading if we just cleared data due to incomplete profile
+            setLoading(false); 
             setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
-        } else if (!error) { // If there's no data and no existing error, set the profile error
+        } else if (!error) { 
             setLoading(false);
             setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
         }
@@ -176,7 +168,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           We are having trouble generating your personalized content at the moment. This could be due to:
           <ul className="list-disc list-inside mt-2">
             <li>Your profile not being fully completed.</li>
-            <li>Temporary issues with the weather or news services.</li>
+            <li>Temporary issues with weather or news services/tools.</li>
             <li>Temporary issues with the AI content generation service.</li>
           </ul>
           Please ensure your profile is complete and try refreshing. If the issue persists, please try again later.
@@ -208,5 +200,3 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     </div>
   );
 }
-
-    

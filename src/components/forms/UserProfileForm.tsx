@@ -23,16 +23,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, CheckSquare, Square } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { useUserProfile } from "@/contexts/UserProfileContext";
-import { RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS, DEFAULT_USER_PROFILE } from "@/lib/constants";
-import type { UserProfile, RunningLevel, TrainingPlan as TrainingPlanType, WeatherUnit, NewsletterDelivery } from "@/lib/types";
+import { RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS, DEFAULT_USER_PROFILE, NEWS_SEARCH_CATEGORIES } from "@/lib/constants";
+import type { UserProfile, RunningLevel, TrainingPlan as TrainingPlanType, WeatherUnit, NewsletterDelivery, NewsSearchCategory } from "@/lib/types";
 import { useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
 import { format, addDays, subDays, isValid, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const newsSearchCategoryValues = NEWS_SEARCH_CATEGORIES.map(c => c.value) as [NewsSearchCategory, ...NewsSearchCategory[]];
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -47,6 +50,7 @@ const formSchema = z.object({
   raceDate: z.string().optional(),
   weatherUnit: z.enum(["C", "F"]),
   newsletterDelivery: z.enum(["email", "hangouts"]),
+  newsSearchPreferences: z.array(z.enum(newsSearchCategoryValues)).optional(),
 }).refine(data => {
   if (data.raceDate && data.planStartDate) {
     const planStartDateValid = parseISO(data.planStartDate);
@@ -69,12 +73,13 @@ export function UserProfileForm() {
     defaultValues: {
       name: "",
       location: "",
-      runningLevel: undefined, // Intentionally undefined, will be set by useEffect
-      trainingPlan: undefined, // Intentionally undefined, will be set by useEffect
+      runningLevel: undefined, 
+      trainingPlan: undefined, 
       planStartDate: undefined,
       raceDate: undefined,
-      weatherUnit: DEFAULT_USER_PROFILE.weatherUnit, // Context ensures this is valid
-      newsletterDelivery: DEFAULT_USER_PROFILE.newsletterDelivery, // Context ensures this is valid
+      weatherUnit: DEFAULT_USER_PROFILE.weatherUnit,
+      newsletterDelivery: DEFAULT_USER_PROFILE.newsletterDelivery,
+      newsSearchPreferences: DEFAULT_USER_PROFILE.newsSearchPreferences || [],
     },
   });
 
@@ -101,31 +106,29 @@ export function UserProfileForm() {
         form.setValue("planStartDate", newPlanStartDate, { shouldValidate: true });
       }
     }
-  }, [watchedRaceDate, watchedTrainingPlan, form, calculatePlanStartDate]);
+  }, [watchedRaceDate, watchedTrainingPlan, calculatePlanStartDate, form]);
 
 
   useEffect(() => {
     if (!loading && userProfile) {
-      // userProfile from context is guaranteed to have valid, non-empty enum strings
-      // for runningLevel, trainingPlan, weatherUnit, newsletterDelivery due to context logic.
       let planStartDateForForm = userProfile.planStartDate;
       if (userProfile.raceDate && userProfile.trainingPlan) {
         planStartDateForForm = calculatePlanStartDate(userProfile.raceDate, userProfile.trainingPlan) || userProfile.planStartDate;
       }
 
       form.reset({
-        name: userProfile.name || "", // Ensure inputs get strings
-        location: userProfile.location || "", // Ensure inputs get strings
-        runningLevel: userProfile.runningLevel, // Directly from context (e.g., "beginner")
-        trainingPlan: userProfile.trainingPlan, // Directly from context (e.g., "5k")
+        name: userProfile.name || "", 
+        location: userProfile.location || "", 
+        runningLevel: userProfile.runningLevel, 
+        trainingPlan: userProfile.trainingPlan, 
         planStartDate: planStartDateForForm,
         raceDate: userProfile.raceDate,
         weatherUnit: userProfile.weatherUnit,
         newsletterDelivery: userProfile.newsletterDelivery,
+        newsSearchPreferences: userProfile.newsSearchPreferences || [],
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, userProfile, calculatePlanStartDate]); // `form` is stable, no need to include
+  }, [loading, userProfile, calculatePlanStartDate, form]);
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     let finalPlanStartDate = values.planStartDate;
@@ -135,7 +138,6 @@ export function UserProfileForm() {
     } else if (!values.raceDate && !values.planStartDate) {
       finalPlanStartDate = format(new Date(), "yyyy-MM-dd");
     }
-
 
     const updatedProfile: UserProfile = {
       id: userProfile.id || uuidv4(),
@@ -147,6 +149,7 @@ export function UserProfileForm() {
       raceDate: values.raceDate,
       weatherUnit: values.weatherUnit,
       newsletterDelivery: values.newsletterDelivery,
+      newsSearchPreferences: values.newsSearchPreferences || [],
     };
 
     setUserProfileState(updatedProfile);
@@ -182,7 +185,7 @@ export function UserProfileForm() {
             <FormItem>
               <FormLabel>Location (City)</FormLabel>
               <FormControl><Input placeholder="e.g., Springfield" {...field} value={field.value || ""} /></FormControl>
-              <FormDescription>Used for local weather information.</FormDescription>
+              <FormDescription>Used for local weather and potentially geographic news.</FormDescription>
               <FormMessage />
             </FormItem>
           )}
@@ -381,6 +384,58 @@ export function UserProfileForm() {
             </FormItem>
           )}
         />
+        
+        <FormField
+          control={form.control}
+          name="newsSearchPreferences"
+          render={() => (
+            <FormItem>
+              <div className="mb-4">
+                <FormLabel className="text-base">News Search Preferences</FormLabel>
+                <FormDescription>
+                  Select topics you're interested in for your news feed.
+                </FormDescription>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {NEWS_SEARCH_CATEGORIES.map((item) => (
+                  <FormField
+                    key={item.value}
+                    control={form.control}
+                    name="newsSearchPreferences"
+                    render={({ field }) => {
+                      return (
+                        <FormItem
+                          key={item.value}
+                          className="flex flex-row items-center space-x-3 space-y-0 p-2 border rounded-md hover:bg-muted/50"
+                        >
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value?.includes(item.value)}
+                              onCheckedChange={(checked) => {
+                                return checked
+                                  ? field.onChange([...(field.value || []), item.value])
+                                  : field.onChange(
+                                      (field.value || []).filter(
+                                        (value) => value !== item.value
+                                      )
+                                    );
+                              }}
+                            />
+                          </FormControl>
+                          <FormLabel className="font-normal cursor-pointer flex-1">
+                            {item.label}
+                          </FormLabel>
+                        </FormItem>
+                      );
+                    }}
+                  />
+                ))}
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
         <Button type="submit" className="bg-primary hover:bg-primary/90 text-primary-foreground">
           Save Preferences
         </Button>
@@ -388,4 +443,3 @@ export function UserProfileForm() {
     </Form>
   );
 }
-
