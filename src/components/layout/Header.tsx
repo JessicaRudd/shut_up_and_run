@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { Zap, CalendarDays, Coffee } from "lucide-react"; // Added CalendarDays for new link, Coffee for support
+import { Zap, CalendarDays } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -50,10 +50,15 @@ export function Header() {
           </Link>
         </nav>
         <div className="flex items-center">
-          <Button asChild variant="outline" size="sm">
-            <Link href="https://studio.buymeacoffee.com/dashboard" target="_blank" rel="noopener noreferrer">
-              <Coffee className="mr-2 h-4 w-4" />
-              Support This App
+          <Button 
+            asChild 
+            variant="default" 
+            size="sm" 
+            className="bg-accent hover:bg-accent/90 text-accent-foreground font-semibold"
+          >
+            <Link href="https://www.buymeacoffee.com/studio" target="_blank" rel="noopener noreferrer">
+              {/* Removed Coffee icon, text changed */}
+              Buy Me A Coffee
             </Link>
           </Button>
         </div>
