@@ -72,6 +72,7 @@ const DressMyRunItemSchema = z.object({
   category: z.string().describe("The general category of the clothing item. Examples: 'hat', 'shirt', 'shorts', 'jacket', 'sunglasses', 'gloves', 'accessory'. Aim for one of these: hat, visor, sunglasses, headband, shirt, tank-top, long-sleeve, base-layer, mid-layer, jacket, vest, windbreaker, rain-jacket, shorts, capris, tights, pants, gloves, mittens, socks, shoes, gaiter, balaclava, accessory."),
 });
 export type DressMyRunItem = z.infer<typeof DressMyRunItemSchema>;
+export type DressMyRunItemCategory = DressMyRunItem['category']; // For use in UI if needed
 
 
 const CustomizeNewsletterOutputSchema = z.object({
@@ -100,7 +101,6 @@ const CustomizeNewsletterOutputSchema = z.object({
 export type CustomizeNewsletterOutput = z.infer<typeof CustomizeNewsletterOutputSchema>;
 
 
-// Tool for generating the greeting - remains the same
 const generateGreetingTool = ai.defineTool({
   name: 'generateWorkoutPunGreeting',
   description: 'Generates a personalized greeting with a running-related pun for the specified user.',
@@ -109,6 +109,7 @@ const generateGreetingTool = ai.defineTool({
   }),
   outputSchema: z.string().describe('The personalized greeting string, including a pun.'),
   async handler(input) {
+    console.log("[generateGreetingTool] Received input:", input);
     const puns = [
       "ready to hit the pavement?",
       "time to make some tracks!",
@@ -117,7 +118,9 @@ const generateGreetingTool = ai.defineTool({
       "chasing that runner's high?"
     ];
     const randomPun = puns[Math.floor(Math.random() * puns.length)];
-    return `Hey ${input.userName}, ${randomPun}`;
+    const greeting = `Hey ${input.userName}, ${randomPun}`;
+    console.log("[generateGreetingTool] Generated greeting:", greeting);
+    return greeting;
   },
 });
 
@@ -131,7 +134,7 @@ const prompt = ai.definePrompt({
   output: {schema: CustomizeNewsletterOutputSchema},
   tools: [
     generateGreetingTool, 
-    fetchGoogleRunningNewsTool // Replaced RSS tool with Google Search tool
+    fetchGoogleRunningNewsTool 
   ],
   prompt: `You are a personalized newsletter generator for runners for Shut Up and Run. You will generate a newsletter based on the user's preferences, training plan, and daily weather forecast.
 
@@ -144,9 +147,9 @@ const prompt = ai.definePrompt({
 
   2. Provide local weather forecast and running recommendation:
      - The input 'weather' ({{{weather}}}) contains structured daily forecast data for {{{location}}} or an error object.
-     - If '{{{weather.error}}}' exists in the input 'weather' object, your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present. In this error case, the 'dressMyRunSuggestion' field should be an empty array.
+     - If '{{{weather.error}}}' exists in the input 'weather' object (e.g., { "error": "City not found" } ), your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present. In this error case, the 'dressMyRunSuggestion' field should be an empty array.
      - Otherwise (if '{{{weather.hourly}}}' exists and '{{{weather.error}}}' does not):
-       - For the 'weather' output field, construct a single informative paragraph.
+       - For the 'weather' output field, construct a single informative paragraph following these steps:
        - Step 1: Present the overall daily forecast summary. This should include: Location: '{{{weather.locationName}}}', Date: '{{{weather.date}}}', General description: '{{{weather.overallDescription}}}', High and low temperatures: '{{{weather.tempMax}}}{{{weatherUnit}}}' and '{{{weather.tempMin}}}{{{weatherUnit}}}', Sunrise and sunset times: '{{{weather.sunrise}}}' and '{{{weather.sunset}}}', Average humidity: '{{{weather.humidityAvg}}}%'.
        - Step 2: Analyze the '{{{weather.hourly}}}' data (which includes 'time', 'temp', 'feelsLike', 'description', 'pop' for precipitation chance, and 'windSpeed') to recommend the BEST time of day to run.
        - Step 3: Your recommendation should be specific (e.g., "around 7 AM" or "between 4 PM and 6 PM").
@@ -157,17 +160,16 @@ const prompt = ai.definePrompt({
 
   4. Fetch, summarize, and prioritize news: Use the 'fetchGoogleRunningNewsTool' to get running news stories.
      - Pass the user's 'newsSearchPreferences' ({{{newsSearchPreferences}}}) and 'location' ({{{location}}}) to the tool.
-     - The tool will return a list of articles with titles, links, and snippets.
+     - The tool will return a list of articles with titles, links, and snippets, or an error if fetching failed.
      - From the articles returned by the tool, select up to 5 of the most relevant and interesting stories for the user.
      - For each selected story, provide a concise summary based on its snippet.
      - Assign a priority (1=highest) to each selected story.
-     - CRITICAL: If the 'fetchGoogleRunningNewsTool' returns an error or no articles (its output 'articles' array is empty), the 'topStories' field in your JSON output MUST be an empty array ([]). Do NOT generate placeholder or fake news. Ensure no more than 5 stories are returned in the final output.
+     - CRITICAL: If the 'fetchGoogleRunningNewsTool' returns an error or its 'articles' array is empty, the 'topStories' field in your JSON output MUST be an empty array ([]). Do NOT generate placeholder or fake news. Ensure no more than 5 stories are returned in the final output.
 
-  5. Plan end notification: If the user's training plan has ended, include a 'planEndNotification' message. Omit if no plan end is indicated.
+  5. Plan end notification: If the user's training plan has ended (indicated by the workout text), include a 'planEndNotification' message. Omit if no plan end is indicated.
 
   6. Generate "Dress Your Run" suggestion for the 'dressMyRunSuggestion' field:
-     - This field MUST be a JSON array of objects. Each object MUST have "item" (string) and "category" (string).
-     - For 'category', use one of: "hat", "visor", "sunglasses", "headband", "shirt", "tank-top", "long-sleeve", "base-layer", "mid-layer", "jacket", "vest", "windbreaker", "rain-jacket", "shorts", "capris", "tights", "pants", "gloves", "mittens", "socks", "shoes", "gaiter", "balaclava", "accessory".
+     - This field MUST be a JSON array of objects. Each object MUST have "item" (string, e.g., "Lightweight t-shirt") and "category" (string, from predefined list like "shirt", "hat", "jacket", "shorts", "sunglasses", "gloves", etc. Use common, general categories).
      - If weather forecast was unavailable ('{{{weather.error}}}' present), 'dressMyRunSuggestion' MUST BE an empty array [].
      - Otherwise, based on weather at the 'best time to run' you identified, provide a DETAILED, ITEMIZED list of clothing recommendations.
      - Consider temperature, 'feelsLike', precipitation 'pop', 'windSpeed', and general description ('sunny', 'cloudy').
@@ -193,13 +195,14 @@ const customizeNewsletterFlow = ai.defineFlow(
     inputSchema: CustomizeNewsletterInputSchema,
     outputSchema: CustomizeNewsletterOutputSchema,
   },
-  async (input: CustomizeNewsletterInput) => {
+  async (input: CustomizeNewsletterInput): Promise<CustomizeNewsletterOutput> => {
+    console.log("[customizeNewsletterFlow] Received input:", JSON.stringify(input, null, 2));
     const {output} = await prompt(input);
 
     if (!output) {
       console.error("[customizeNewsletterFlow] AI prompt did not produce any output for input:", JSON.stringify(input, null, 2));
-      // Fallback logic if AI fails completely
-      const fallbackGreeting = `Hello ${input.userName}, have a great run!`;
+      
+      const fallbackGreeting = `Hello ${input.userName}, your personalized newsletter could not be generated by the AI at this time.`;
       let fallbackWeather: string;
       const weatherInput = input.weather; 
       const weatherHasError = typeof weatherInput === 'object' && weatherInput && 'error' in weatherInput && typeof weatherInput.error === 'string' && weatherInput.error.length > 0;
@@ -207,10 +210,11 @@ const customizeNewsletterFlow = ai.defineFlow(
       if (weatherHasError) {
         fallbackWeather = `Weather forecast for ${input.location} is currently unavailable: ${weatherInput.error}`;
       } else {
-        fallbackWeather = `Could not generate weather summary for ${input.location} at this time. Please try again later.`;
+        fallbackWeather = `Could not generate weather summary and running recommendation for ${input.location} at this time due to an AI processing issue.`;
       }
       const fallbackWorkout = input.workout || "No workout information available.";
-      return {
+      
+      const fallbackResult: CustomizeNewsletterOutput = {
         greeting: fallbackGreeting,
         weather: fallbackWeather,
         workout: fallbackWorkout,
@@ -218,12 +222,13 @@ const customizeNewsletterFlow = ai.defineFlow(
         planEndNotification: undefined,
         dressMyRunSuggestion: [], 
       };
+      console.log("[customizeNewsletterFlow] Returning fallback due to no AI output:", fallbackResult);
+      return fallbackResult;
     }
+    console.log("[customizeNewsletterFlow] AI prompt produced output:", JSON.stringify(output, null, 2));
 
-    // Safeguards for topStories (e.g., if AI hallucinates news when tool returns none)
-    // This specific check (input.newsStories being empty) is less relevant now as news is fetched by a tool.
-    // The prompt instructs the AI to return empty array if tool returns no news.
-    // However, we still ensure the output format is correct.
+
+    // Safeguard for topStories
     if (!Array.isArray(output.topStories)) { 
         console.warn("[customizeNewsletterFlow] AI output for topStories was not an array or was missing. Defaulting to empty array. Received:", output.topStories);
         output.topStories = [];
@@ -237,28 +242,10 @@ const customizeNewsletterFlow = ai.defineFlow(
         ).slice(0, 5); 
     }
     
-    // Safeguards for dressMyRunSuggestion
+    // Safeguard for dressMyRunSuggestion
     if (!Array.isArray(output.dressMyRunSuggestion)) {
-        console.warn("[customizeNewsletterFlow] AI output for dressMyRunSuggestion was not an array, attempting to correct. Received:", output.dressMyRunSuggestion);
-        if (typeof output.dressMyRunSuggestion === 'string') {
-            try {
-                const parsedSuggestion = JSON.parse(output.dressMyRunSuggestion as string);
-                if (Array.isArray(parsedSuggestion)) {
-                    output.dressMyRunSuggestion = parsedSuggestion.filter(item =>
-                        typeof item === 'object' && item !== null &&
-                        'item' in item && typeof item.item === 'string' &&
-                        'category' in item && typeof item.category === 'string'
-                    );
-                } else {
-                    output.dressMyRunSuggestion = [];
-                }
-            } catch (e) {
-                console.error("[customizeNewsletterFlow] Could not parse string dressMyRunSuggestion from AI into array:", e);
-                output.dressMyRunSuggestion = [];
-            }
-        } else {
-             output.dressMyRunSuggestion = [];
-        }
+        console.warn("[customizeNewsletterFlow] AI output for dressMyRunSuggestion was not an array. Received:", output.dressMyRunSuggestion, "Defaulting to empty array.");
+        output.dressMyRunSuggestion = [];
     } else {
         output.dressMyRunSuggestion = output.dressMyRunSuggestion.filter(item =>
             typeof item === 'object' && item !== null &&
@@ -267,13 +254,16 @@ const customizeNewsletterFlow = ai.defineFlow(
         );
     }
     
+    // Ensure dressMyRunSuggestion is empty if weather had an error, even if AI hallucinates it
     const weatherInput = input.weather;
     const weatherHasError = typeof weatherInput === 'object' && weatherInput && 'error' in weatherInput && typeof weatherInput.error === 'string' && weatherInput.error.length > 0;
     if (weatherHasError && output.dressMyRunSuggestion.length > 0) {
         console.warn("[customizeNewsletterFlow] Weather had an error, but AI generated dressMyRunSuggestion. Overriding to empty array.");
         output.dressMyRunSuggestion = [];
     }
-
+    
+    console.log("[customizeNewsletterFlow] Returning processed output:", output);
     return output;
   }
 );
+
