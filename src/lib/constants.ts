@@ -36,11 +36,12 @@ export const DEFAULT_USER_PROFILE = {
 };
 
 export const RSS_FEED_URLS: string[] = [
-  'https://www.runnersworld.com/rss/all.xml/',
+  'https://hungryrunnergirl.com/feed?x=1',
   'https://www.irunfar.com/feed',
-  'https://strengthrunning.com/feed/',
-  'https://www.trailrunnermag.com/feed',
-  'https://www.womensrunning.com/feed/'
+  'https://lauranorrisrunning.com/feed/',
+  'https://www.dcrainmaker.com/feed',
+  'http://www.carleemcdot.com/feeds/posts/default', // Note: HTTP, might have issues in some environments
+  'http://feeds.feedburner.com/AliOnTheRun' // Note: HTTP, might have issues in some environments
 ];
 
 // For AI flow, structure for news article input
