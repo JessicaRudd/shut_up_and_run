@@ -4,11 +4,10 @@
 import { useEffect, useState } from "react";
 import type { UserProfile, DailyForecastData } from "@/lib/types";
 import { customizeNewsletter, type CustomizeNewsletterOutput, type CustomizeNewsletterInput } from "@/ai/flows/customize-newsletter-content";
-// import { mockArticles } from "@/lib/mockNews"; // Remove mock articles
 import { getTodaysWorkout } from "@/lib/workoutUtils";
 import { getWeatherByLocation } from "@/services/weatherService"; 
-import { fetchAndParseRSSFeeds } from "@/services/newsService"; // Import new news service
-import { RSS_FEED_URLS, type NewsArticleAIInput } from "@/lib/constants"; // Import RSS_FEED_URLS
+import { fetchAndParseRSSFeeds } from "@/services/newsService"; 
+import { RSS_FEED_URLS, type NewsArticleAIInput } from "@/lib/constants"; 
 
 import { GreetingSection } from "./GreetingSection";
 import { WeatherSection } from "./WeatherSection";
@@ -92,7 +91,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           trainingPlanType: userProfile.trainingPlan || "5k",
           raceDistance: derivedRaceDistance,
           workout: todaysWorkout,
-          newsStories: fetchedArticles, // Use fetched articles
+          newsStories: fetchedArticles, 
           weather: weatherInputForAI,
           weatherUnit: userProfile.weatherUnit || "F", 
         };
