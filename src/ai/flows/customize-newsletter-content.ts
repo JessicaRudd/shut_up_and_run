@@ -116,7 +116,7 @@ const summarizeNewsTool = ai.defineTool({
           })
         )
         .describe('An array of running-related news articles, potentially with snippets instead of full content.'),
-      userContext: z.object({ // userContext is still defined but won't be actively used in this simplified handler
+      userContext: z.object({ 
         runningLevel: z.string().describe('The running level of the user.'),
         trainingPlanType: z.string().describe('The type of training plan the user is following.'),
         raceDistance: z.string().describe('The race distance the user is training for.'),
@@ -137,16 +137,11 @@ const summarizeNewsTool = ai.defineTool({
         return [];
       }
 
-      // Simplified logic: take the first 5 articles provided.
-      // The AI is still asked to summarize and prioritize, so it might choose fewer
-      // or re-prioritize based on its own understanding if the tool returns more than needed for its final output.
-      // The tool provides up to 5 to give the AI a good selection.
       const articlesToConsider = input.articles.slice(0, 5);
 
       const selectedArticles = articlesToConsider.map((article, index) => {
         let summary = article.content;
-        // Basic summarization/truncation
-        if (summary.length > 200) { // Shorter summary length for snippets
+        if (summary.length > 200) {
           summary = summary.substring(0, 197) + "...";
         } else if (summary.length < 30 && article.title.length > summary.length) {
             summary = `Read more about: "${article.title}".`;
@@ -158,7 +153,7 @@ const summarizeNewsTool = ai.defineTool({
           title: article.title,
           summary: summary,
           url: article.url,
-          priority: index + 1, // Simple priority based on order received
+          priority: index + 1, 
         };
       });
       console.log('[summarizeNewsTool] Produced articles:', selectedArticles.length);
@@ -197,7 +192,9 @@ const prompt = ai.definePrompt({
   tools: [summarizeNewsTool, generateGreetingTool],
   prompt: `You are a personalized newsletter generator for runners for Shut Up and Run. You will generate a newsletter based on the user's preferences, training plan, and daily weather forecast.
 
-  Your response MUST be in JSON format, adhering to the defined output schema. If newsStories input is empty or no relevant stories are found by the summarizeAndPrioritizeNews tool, the 'topStories' field in the output should be an empty array. The 'topStories' field must contain a maximum of 5 articles.
+  Your response MUST be in JSON format, adhering to the defined output schema. 
+  If the 'newsStories' input (passed to the summarizeAndPrioritizeNews tool) is empty, or if the summarizeAndPrioritizeNews tool returns no relevant stories, then the 'topStories' field in your JSON output MUST be an empty array ([]). Do not invent news stories.
+  The 'topStories' field must contain a maximum of 5 articles.
 
   Tasks to perform:
   1. Generate a personalized greeting: Use the 'generateWorkoutPunGreeting' tool. The user's name is {{{userName}}}.
@@ -222,10 +219,10 @@ const prompt = ai.definePrompt({
 
   3. Display scheduled workout: The workout for today is '{{{workout}}}'. Include this in the output.
 
-  4. Summarize and prioritize news: Use the 'summarizeAndPrioritizeNews' tool to get the top 5 running news stories.
+  4. Summarize and prioritize news: Use the 'summarizeAndPrioritizeNews' tool to get up to 5 running news stories.
      - The articles to process are available in the 'newsStories' input field: {{{newsStories}}}. These articles contain snippets or descriptions from RSS feeds, not necessarily full content. The tool should summarize these snippets.
      - Pass the user's context (runningLevel: '{{{runningLevel}}}', trainingPlanType: '{{{trainingPlanType}}}', raceDistance: '{{{raceDistance}}}') to the tool.
-     - If 'newsStories' is empty or the tool finds no relevant articles, 'topStories' in the output must be an empty array. Ensure no more than 5 stories are returned in the final output.
+     - CRITICAL: If 'newsStories' input is empty, or if the tool returns an empty list, the 'topStories' field in your JSON output MUST be an empty array ([]). Do NOT generate placeholder or fake news. Ensure no more than 5 stories are returned in the final output.
 
   5. Plan end notification: If the user's training plan has ended (this information might be implicitly part of the workout or overall context), include a 'planEndNotification' message encouraging them to update their profile. Omit if no plan end is indicated.
 
@@ -234,7 +231,7 @@ const prompt = ai.definePrompt({
      - For the 'category' field, try to use one of these: "hat", "visor", "sunglasses", "headband", "shirt", "tank-top", "long-sleeve", "base-layer", "mid-layer", "jacket", "vest", "windbreaker", "rain-jacket", "shorts", "capris", "tights", "pants", "gloves", "mittens", "socks", "shoes", "gaiter", "balaclava", "accessory". If none of these fit perfectly, use a reasonable, concise category name.
      - Act as an expert running coach providing detailed clothing advice.
      - If the weather forecast was unavailable (i.e., '{{{weather.error}}}' was present in the weather input), the 'dressMyRunSuggestion' field MUST BE an empty array [].
-     - Otherwise, based on the specific weather conditions (temperature, 'feelsLike' temperature, precipitation chance 'pop', wind speed, and general description like 'sunny', 'cloudy') expected around the 'best time to run' you previously identified when generating the 'weather' field, provide a DETAILED, ITEMIZED list of clothing recommendations.
+     - Otherwise, based on the specific weather conditions (temperature, 'feelsLike' temperature, precipitation chance 'pop', windSpeed, and general description like 'sunny', 'cloudy') expected around the 'best time to run' you previously identified when generating the 'weather' field, provide a DETAILED, ITEMIZED list of clothing recommendations.
      - Example item object: { "item": "Moisture-wicking short-sleeve shirt", "category": "shirt" }
      - Example full array output for 'dressMyRunSuggestion' for a cool morning:
        [
@@ -279,12 +276,12 @@ const customizeNewsletterFlow = ai.defineFlow(
     const {output} = await prompt(input);
 
     if (!output) {
-      console.error("AI prompt did not produce expected output for input:", JSON.stringify(input, null, 2));
+      console.error("[customizeNewsletterFlow] AI prompt did not produce any output for input:", JSON.stringify(input, null, 2));
 
       const fallbackGreeting = `Hello ${input.userName}, have a great run!`;
       let fallbackWeather: string;
 
-      const weatherInput = input.weather; // Alias for clarity
+      const weatherInput = input.weather; 
       const weatherHasError = typeof weatherInput === 'object' && weatherInput && 'error' in weatherInput && typeof weatherInput.error === 'string' && weatherInput.error.length > 0;
 
       if (weatherHasError) {
@@ -299,15 +296,36 @@ const customizeNewsletterFlow = ai.defineFlow(
         greeting: fallbackGreeting,
         weather: fallbackWeather,
         workout: fallbackWorkout,
-        topStories: [],
+        topStories: [], // Ensure topStories is empty in complete failure case
         planEndNotification: undefined,
-        dressMyRunSuggestion: [],
+        dressMyRunSuggestion: [], // Ensure dressMyRunSuggestion is empty
       };
     }
 
-    // Defensive check for dressMyRunSuggestion structure
+    // Safeguard against AI hallucinating news when input is empty
+    if ((!input.newsStories || input.newsStories.length === 0) && output.topStories && output.topStories.length > 0) {
+        console.warn("[customizeNewsletterFlow] Input newsStories was empty, but AI generated stories. Overriding to empty array to prevent hallucination.");
+        output.topStories = [];
+    } else if (!Array.isArray(output.topStories)) { 
+        console.warn("[customizeNewsletterFlow] AI output for topStories was not an array or was missing. Defaulting to empty array. Received:", output.topStories);
+        output.topStories = [];
+    } else { 
+        output.topStories = output.topStories.filter(story =>
+            typeof story === 'object' && story !== null &&
+            typeof story.title === 'string' &&
+            typeof story.summary === 'string' &&
+            typeof story.url === 'string' && // Re-enforce URL check
+            typeof story.priority === 'number'
+        ).slice(0, 5); 
+    }
+    
+    if (output.topStories.length < 5 && input.newsStories && input.newsStories.length > output.topStories.length) {
+        console.log(`[customizeNewsletterFlow] AI returned ${output.topStories.length} stories, though ${input.newsStories.length} were provided as input to the tool.`);
+    }
+
+
     if (!Array.isArray(output.dressMyRunSuggestion)) {
-        console.warn("AI output for dressMyRunSuggestion was not an array, attempting to correct. Received:", output.dressMyRunSuggestion);
+        console.warn("[customizeNewsletterFlow] AI output for dressMyRunSuggestion was not an array, attempting to correct. Received:", output.dressMyRunSuggestion);
         if (typeof output.dressMyRunSuggestion === 'string') {
             try {
                 const parsedSuggestion = JSON.parse(output.dressMyRunSuggestion as string);
@@ -321,7 +339,7 @@ const customizeNewsletterFlow = ai.defineFlow(
                     output.dressMyRunSuggestion = [];
                 }
             } catch (e) {
-                console.error("Could not parse string dressMyRunSuggestion from AI into array:", e);
+                console.error("[customizeNewsletterFlow] Could not parse string dressMyRunSuggestion from AI into array:", e);
                 output.dressMyRunSuggestion = [];
             }
         } else {
@@ -334,28 +352,17 @@ const customizeNewsletterFlow = ai.defineFlow(
             'category' in item && typeof item.category === 'string'
         );
     }
-
-    // Ensure topStories is an array and items are structured correctly
-    if (!Array.isArray(output.topStories)) {
-        console.warn("AI output for topStories was not an array. Defaulting to empty array. Received:", output.topStories);
-        output.topStories = [];
-    } else {
-        output.topStories = output.topStories.filter(story =>
-            typeof story === 'object' && story !== null &&
-            typeof story.title === 'string' &&
-            typeof story.summary === 'string' &&
-            typeof story.url === 'string' &&
-            typeof story.priority === 'number'
-        ).slice(0, 5); // Ensure max 5 stories
+    
+    const weatherInput = input.weather;
+    const weatherHasError = typeof weatherInput === 'object' && weatherInput && 'error' in weatherInput && typeof weatherInput.error === 'string' && weatherInput.error.length > 0;
+    if (weatherHasError && output.dressMyRunSuggestion.length > 0) {
+        console.warn("[customizeNewsletterFlow] Weather had an error, but AI generated dressMyRunSuggestion. Overriding to empty array.");
+        output.dressMyRunSuggestion = [];
     }
 
-    if (output.topStories.length < 5 && input.newsStories.length > output.topStories.length) {
-        console.log(`AI returned ${output.topStories.length} stories, though ${input.newsStories.length} were provided as input to the tool.`);
-    }
 
     return output;
   }
 );
-
 
     
