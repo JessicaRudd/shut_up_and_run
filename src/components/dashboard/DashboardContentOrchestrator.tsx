@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import type { UserProfile, DailyForecastData } from "@/lib/types";
 import { customizeNewsletter, type CustomizeNewsletterOutput, type CustomizeNewsletterInput } from "@/ai/flows/customize-newsletter-content";
 import { getTodaysWorkout } from "@/lib/workoutUtils";
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { TRAINING_PLANS } from "@/lib/constants";
+import { format } from "date-fns";
 
 interface DashboardContentOrchestratorProps {
   userProfile: UserProfile;
@@ -28,101 +29,121 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [weatherErrorForAI, setWeatherErrorForAI] = useState<string | null>(null);
+  const [lastFetchedDate, setLastFetchedDate] = useState<string | null>(null);
 
 
-  useEffect(() => {
+  const fetchNewsletterDataCallback = useCallback(async (currentDateStr: string) => {
     if (!userProfile.name || !userProfile.location || !userProfile.weatherUnit) {
       setLoading(false);
       setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
+      setNewsletterData(null);
+      setLastFetchedDate(null); // Reset fetch date if profile is incomplete
       return;
     }
 
-    async function fetchNewsletterData() {
-      setLoading(true);
-      setError(null);
-      setWeatherErrorForAI(null);
+    setLoading(true);
+    setError(null);
+    setWeatherErrorForAI(null);
+
+    try {
+      const todaysWorkout = getTodaysWorkout(userProfile);
+      
+      const weatherApiUnit = userProfile.weatherUnit === "C" ? "metric" : "imperial";
+      const weatherResult = await getWeatherByLocation(userProfile.location, weatherApiUnit);
+
+      let weatherInputForAI: CustomizeNewsletterInput['weather'];
+
+      if ('error' in weatherResult) {
+        console.warn("Weather service returned an error:", weatherResult.error);
+        weatherInputForAI = { error: weatherResult.error };
+        setWeatherErrorForAI(weatherResult.error); 
+      } else {
+        weatherInputForAI = weatherResult as DailyForecastData;
+        if (weatherResult.error) {
+          console.warn("Weather data processed with an internal error:", weatherResult.error);
+          setWeatherErrorForAI(weatherResult.error);
+           weatherInputForAI = { ...weatherResult, error: weatherResult.error };
+        }
+      }
+
+      let fetchedArticles: NewsArticleAIInput[] = [];
       try {
-        const todaysWorkout = getTodaysWorkout(userProfile);
-        
-        const weatherApiUnit = userProfile.weatherUnit === "C" ? "metric" : "imperial";
-        const weatherResult = await getWeatherByLocation(userProfile.location, weatherApiUnit);
-
-        let weatherInputForAI: CustomizeNewsletterInput['weather'];
-
-        if ('error' in weatherResult) {
-          console.warn("Weather service returned an error:", weatherResult.error);
-          weatherInputForAI = { error: weatherResult.error };
-          setWeatherErrorForAI(weatherResult.error); 
-        } else {
-          weatherInputForAI = weatherResult as DailyForecastData;
-          if (weatherResult.error) {
-            console.warn("Weather data processed with an internal error:", weatherResult.error);
-            setWeatherErrorForAI(weatherResult.error);
+        fetchedArticles = await fetchAndParseRSSFeeds(RSS_FEED_URLS);
+        if (fetchedArticles.length === 0) {
+          console.warn("No articles fetched from RSS feeds. AI will receive empty news list.");
+        }
+      } catch (newsError: any) {
+        console.error("Error fetching news articles:", newsError);
+      }
+      
+      let derivedRaceDistance = "General Fitness";
+      if (userProfile.trainingPlan) {
+          const planDetails = TRAINING_PLANS.find(p => p.value === userProfile.trainingPlan);
+          if (planDetails) {
+              derivedRaceDistance = planDetails.label.replace(" Plan", "").replace(" Race", "");
+          } else {
+              derivedRaceDistance = userProfile.trainingPlan;
           }
-        }
+      }
 
-        // Fetch real news articles
-        let fetchedArticles: NewsArticleAIInput[] = [];
-        try {
-          fetchedArticles = await fetchAndParseRSSFeeds(RSS_FEED_URLS);
-          if (fetchedArticles.length === 0) {
-            console.warn("No articles fetched from RSS feeds. AI will receive empty news list.");
-          }
-        } catch (newsError: any) {
-          console.error("Error fetching news articles:", newsError);
-          // Proceed with empty articles list, AI flow should handle this
-        }
-        
-        let derivedRaceDistance = "General Fitness";
-        if (userProfile.trainingPlan) {
-            const planDetails = TRAINING_PLANS.find(p => p.value === userProfile.trainingPlan);
-            if (planDetails) {
-                derivedRaceDistance = planDetails.label.replace(" Plan", "").replace(" Race", "");
-            } else {
-                derivedRaceDistance = userProfile.trainingPlan;
-            }
-        }
+      const input: CustomizeNewsletterInput = {
+        userName: userProfile.name,
+        location: userProfile.location,
+        runningLevel: userProfile.runningLevel || "beginner",
+        trainingPlanType: userProfile.trainingPlan || "5k",
+        raceDistance: derivedRaceDistance,
+        workout: todaysWorkout,
+        newsStories: fetchedArticles, 
+        weather: weatherInputForAI,
+        weatherUnit: userProfile.weatherUnit || "F", 
+      };
+      
+      const result = await customizeNewsletter(input);
+      setNewsletterData(result);
+      setLastFetchedDate(currentDateStr);
+    } catch (err: any) {
+      console.error("Error fetching personalized newsletter data, weather or news:", err);
+      let errorMessage = "Could not load your personalized dashboard. ";
+      if (err.message) {
+        errorMessage += err.message;
+      } else if (typeof err === 'string') {
+        errorMessage += err;
+      } else {
+        errorMessage += "An unknown error occurred."
+      }
+      if (weatherErrorForAI && (err.message?.toLowerCase().includes('ai') || err.message?.toLowerCase().includes('flow'))) {
+          setError(`Failed to process weather data: ${weatherErrorForAI}. Details: ${errorMessage}`);
+      } else {
+          setError(errorMessage);
+      }
+      setNewsletterData(null);
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile]); // Removed newsletterData, lastFetchedDate to avoid re-trigger loop if fetchNewsletterDataCallback itself changes identity
 
-
-        const input: CustomizeNewsletterInput = {
-          userName: userProfile.name,
-          location: userProfile.location,
-          runningLevel: userProfile.runningLevel || "beginner",
-          trainingPlanType: userProfile.trainingPlan || "5k",
-          raceDistance: derivedRaceDistance,
-          workout: todaysWorkout,
-          newsStories: fetchedArticles, 
-          weather: weatherInputForAI,
-          weatherUnit: userProfile.weatherUnit || "F", 
-        };
-        
-        const result = await customizeNewsletter(input);
-        setNewsletterData(result);
-      } catch (err: any) {
-        console.error("Error fetching personalized newsletter data, weather or news:", err);
-        let errorMessage = "Could not load your personalized dashboard. ";
-        if (err.message) {
-          errorMessage += err.message;
-        } else if (typeof err === 'string') {
-          errorMessage += err;
-        } else {
-          errorMessage += "An unknown error occurred."
+  useEffect(() => {
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+    if (!newsletterData || lastFetchedDate !== todayStr) {
+      if (userProfile.name && userProfile.location && userProfile.weatherUnit) { // Only fetch if profile is minimally complete
+         fetchNewsletterDataCallback(todayStr);
+      } else {
+        // If profile becomes incomplete after having data, clear it
+        if (newsletterData) { 
+            setNewsletterData(null);
+            setLoading(false); // Not loading if we just cleared data due to incomplete profile
+            setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
+        } else if (!error) { // If there's no data and no existing error, set the profile error
+            setLoading(false);
+            setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
         }
-        if (weatherErrorForAI && (err.message?.toLowerCase().includes('ai') || err.message?.toLowerCase().includes('flow'))) {
-            setError(`Failed to process weather data: ${weatherErrorForAI}. Details: ${errorMessage}`);
-        } else {
-            setError(errorMessage);
-        }
-      } finally {
-        setLoading(false);
       }
     }
+  }, [userProfile, newsletterData, lastFetchedDate, fetchNewsletterDataCallback, error]);
 
-    fetchNewsletterData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userProfile]);
 
-  if (loading) {
+  if (loading && !newsletterData && !error) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-28 w-full" />
@@ -187,3 +208,5 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     </div>
   );
 }
+
+    
