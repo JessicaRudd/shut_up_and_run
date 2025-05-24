@@ -1,7 +1,8 @@
+
 "use client";
 
 import Link from "next/link";
-import { Zap, CalendarDays } from "lucide-react"; // Added CalendarDays for new link
+import { Zap, CalendarDays, Coffee } from "lucide-react"; // Added CalendarDays for new link, Coffee for support
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -18,7 +19,7 @@ export function Header() {
             Shut Up and Run
           </span>
         </Link>
-        <nav className="flex items-center gap-4 text-sm lg:gap-6">
+        <nav className="flex items-center gap-4 text-sm lg:gap-6 flex-grow">
           <Link
             href="/"
             className={cn(
@@ -48,6 +49,14 @@ export function Header() {
             Profile
           </Link>
         </nav>
+        <div className="flex items-center">
+          <Button asChild variant="outline" size="sm">
+            <Link href="https://studio.buymeacoffee.com/dashboard" target="_blank" rel="noopener noreferrer">
+              <Coffee className="mr-2 h-4 w-4" />
+              Support This App
+            </Link>
+          </Button>
+        </div>
       </div>
     </header>
   );
