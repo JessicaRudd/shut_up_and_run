@@ -4,15 +4,17 @@
 import { useEffect, useState } from "react";
 import type { UserProfile, DailyForecastData } from "@/lib/types";
 import { customizeNewsletter, type CustomizeNewsletterOutput, type CustomizeNewsletterInput } from "@/ai/flows/customize-newsletter-content";
-import { mockArticles } from "@/lib/mockNews"; 
+// import { mockArticles } from "@/lib/mockNews"; // Remove mock articles
 import { getTodaysWorkout } from "@/lib/workoutUtils";
 import { getWeatherByLocation } from "@/services/weatherService"; 
+import { fetchAndParseRSSFeeds } from "@/services/newsService"; // Import new news service
+import { RSS_FEED_URLS, type NewsArticleAIInput } from "@/lib/constants"; // Import RSS_FEED_URLS
 
 import { GreetingSection } from "./GreetingSection";
 import { WeatherSection } from "./WeatherSection";
 import { WorkoutSection } from "./WorkoutSection";
 import { NewsSection } from "./NewsSection";
-import { DressMyRunSection } from "./DressMyRunSection"; // Import new section
+import { DressMyRunSection } from "./DressMyRunSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
@@ -39,7 +41,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     async function fetchNewsletterData() {
       setLoading(true);
       setError(null);
-      setWeatherErrorForAI(null); // Reset at the beginning
+      setWeatherErrorForAI(null);
       try {
         const todaysWorkout = getTodaysWorkout(userProfile);
         
@@ -48,27 +50,37 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
 
         let weatherInputForAI: CustomizeNewsletterInput['weather'];
 
-        if ('error' in weatherResult) { // This means weatherResult IS { error: string } directly from service
+        if ('error' in weatherResult) {
           console.warn("Weather service returned an error:", weatherResult.error);
           weatherInputForAI = { error: weatherResult.error };
           setWeatherErrorForAI(weatherResult.error); 
-        } else { // This means weatherResult IS DailyForecastData
+        } else {
           weatherInputForAI = weatherResult as DailyForecastData;
-          if (weatherResult.error) { // Check for internal error within DailyForecastData object
+          if (weatherResult.error) {
             console.warn("Weather data processed with an internal error:", weatherResult.error);
-            // weatherInputForAI is already weatherResult which contains the .error
-            setWeatherErrorForAI(weatherResult.error); // Ensure this is set for local fallback display too
+            setWeatherErrorForAI(weatherResult.error);
           }
         }
+
+        // Fetch real news articles
+        let fetchedArticles: NewsArticleAIInput[] = [];
+        try {
+          fetchedArticles = await fetchAndParseRSSFeeds(RSS_FEED_URLS);
+          if (fetchedArticles.length === 0) {
+            console.warn("No articles fetched from RSS feeds. AI will receive empty news list.");
+          }
+        } catch (newsError: any) {
+          console.error("Error fetching news articles:", newsError);
+          // Proceed with empty articles list, AI flow should handle this
+        }
         
-        // Derive raceDistance from trainingPlan for AI context
         let derivedRaceDistance = "General Fitness";
         if (userProfile.trainingPlan) {
             const planDetails = TRAINING_PLANS.find(p => p.value === userProfile.trainingPlan);
             if (planDetails) {
-                derivedRaceDistance = planDetails.label.replace(" Plan", "").replace(" Race", ""); // e.g. "5K", "Half Marathon"
+                derivedRaceDistance = planDetails.label.replace(" Plan", "").replace(" Race", "");
             } else {
-                derivedRaceDistance = userProfile.trainingPlan; // Fallback to plan value if not in constants
+                derivedRaceDistance = userProfile.trainingPlan;
             }
         }
 
@@ -78,9 +90,9 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           location: userProfile.location,
           runningLevel: userProfile.runningLevel || "beginner",
           trainingPlanType: userProfile.trainingPlan || "5k",
-          raceDistance: derivedRaceDistance, // Use derived value
+          raceDistance: derivedRaceDistance,
           workout: todaysWorkout,
-          newsStories: mockArticles.map(a => ({ title: a.title, url: a.url, content: a.content })),
+          newsStories: fetchedArticles, // Use fetched articles
           weather: weatherInputForAI,
           weatherUnit: userProfile.weatherUnit || "F", 
         };
@@ -88,7 +100,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
         const result = await customizeNewsletter(input);
         setNewsletterData(result);
       } catch (err: any) {
-        console.error("Error fetching personalized newsletter data or weather:", err);
+        console.error("Error fetching personalized newsletter data, weather or news:", err);
         let errorMessage = "Could not load your personalized dashboard. ";
         if (err.message) {
           errorMessage += err.message;
@@ -97,7 +109,6 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
         } else {
           errorMessage += "An unknown error occurred."
         }
-        // Prioritize showing a weather-specific error if it's available and AI processing failed
         if (weatherErrorForAI && (err.message?.toLowerCase().includes('ai') || err.message?.toLowerCase().includes('flow'))) {
             setError(`Failed to process weather data: ${weatherErrorForAI}. Details: ${errorMessage}`);
         } else {
@@ -120,7 +131,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           <Skeleton className="h-64 w-full" /> 
           <Skeleton className="h-48 w-full" /> 
         </div>
-        <Skeleton className="h-48 w-full" /> {/* Skeleton for DressMyRunSection */}
+        <Skeleton className="h-48 w-full" />
         <Skeleton className="h-72 w-full" /> 
       </div>
     );
@@ -145,7 +156,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           We are having trouble generating your personalized content at the moment. This could be due to:
           <ul className="list-disc list-inside mt-2">
             <li>Your profile not being fully completed.</li>
-            <li>Temporary issues with the weather service.</li>
+            <li>Temporary issues with the weather or news services.</li>
             <li>Temporary issues with the AI content generation service.</li>
           </ul>
           Please ensure your profile is complete and try refreshing. If the issue persists, please try again later.
@@ -177,4 +188,3 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     </div>
   );
 }
-

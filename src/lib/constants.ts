@@ -27,12 +27,25 @@ export const DEFAULT_USER_PROFILE = {
   id: '',
   name: '',
   location: '',
-  runningLevel: "beginner" as const, // Default to a valid enum value
-  trainingPlan: "5k" as const, // Default to a valid enum value
-  // raceDistance: '', // Removed
+  runningLevel: "beginner" as const, 
+  trainingPlan: "5k" as const, 
   planStartDate: undefined,
   raceDate: undefined,
   weatherUnit: "F" as const,
   newsletterDelivery: "email" as const,
 };
 
+export const RSS_FEED_URLS: string[] = [
+  'https://www.runnersworld.com/rss/all.xml/',
+  'https://www.irunfar.com/feed',
+  'https://strengthrunning.com/feed/',
+  'https://www.trailrunnermag.com/feed',
+  'https://www.womensrunning.com/feed/'
+];
+
+// For AI flow, structure for news article input
+export type NewsArticleAIInput = {
+  title: string;
+  url: string;
+  content: string; // This will be the snippet/description from RSS
+};
