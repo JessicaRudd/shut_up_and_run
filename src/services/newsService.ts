@@ -1,3 +1,4 @@
+
 // src/services/newsService.ts
 'use server';
 
@@ -24,7 +25,7 @@ export async function fetchAndParseRSSFeeds(feedUrls: string[]): Promise<NewsArt
   
   const articles: NewsArticleAIInput[] = [];
   const MAX_ARTICLES_PER_FEED = 5; 
-  const MAX_TOTAL_ARTICLES = 30; // Increased slightly to get a better pool for selection
+  const MAX_TOTAL_ARTICLES = 30; 
 
   console.log('[NewsService] Starting to fetch RSS feeds:', feedUrls);
 
@@ -36,7 +37,7 @@ export async function fetchAndParseRSSFeeds(feedUrls: string[]): Promise<NewsArt
     try {
       console.log(`[NewsService] Fetching feed: ${url}`);
       const feed = await parser.parseURL(url);
-      console.log(`[NewsService] Successfully fetched and parsed: ${feed.title || 'Untitled Feed'} (Items: ${feed.items.length})`);
+      console.log(`[NewsService] Successfully fetched and parsed: ${feed.title || 'Untitled Feed'} (Found ${feed.items.length} items)`);
       
       let articlesFromThisFeed = 0;
       for (const item of feed.items) {
@@ -58,8 +59,12 @@ export async function fetchAndParseRSSFeeds(feedUrls: string[]): Promise<NewsArt
             content: plainTextContent.substring(0, 500), 
           });
           articlesFromThisFeed++;
+        } else {
+          if (!item.title) console.warn(`[NewsService] Feed item in ${url} missing title.`);
+          if (!item.link) console.warn(`[NewsService] Feed item in ${url} (title: ${item.title || 'N/A'}) missing link.`);
         }
       }
+      console.log(`[NewsService] Added ${articlesFromThisFeed} articles from ${url}. Total articles now: ${articles.length}`);
     } catch (error: any) {
       console.error(`[NewsService] Error fetching or parsing RSS feed ${url}:`, error.message);
       if (error.message && error.message.includes('Invalid XML')) {

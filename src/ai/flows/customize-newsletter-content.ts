@@ -71,10 +71,11 @@ export type CustomizeNewsletterInput = z.infer<typeof CustomizeNewsletterInputSc
 
 const DressMyRunItemSchema = z.object({
   item: z.string().describe("The specific clothing item recommended, e.g., 'Lightweight, moisture-wicking t-shirt' or 'Sunglasses'."),
+  // Using z.string() for category to be more lenient with AI output, while still prompting for specific ones.
   category: z.string().describe("The general category of the clothing item. Examples: 'hat', 'shirt', 'shorts', 'jacket', 'sunglasses', 'gloves', 'accessory'. Aim for one of these: hat, visor, sunglasses, headband, shirt, tank-top, long-sleeve, base-layer, mid-layer, jacket, vest, windbreaker, rain-jacket, shorts, capris, tights, pants, gloves, mittens, socks, shoes, gaiter, balaclava, accessory."),
 });
 export type DressMyRunItem = z.infer<typeof DressMyRunItemSchema>;
-export type DressMyRunItemCategory = DressMyRunItem['category'];
+// Category type not exported anymore as it's generic string for AI schema, UI handles mapping
 
 
 const CustomizeNewsletterOutputSchema = z.object({
@@ -131,19 +132,22 @@ const summarizeNewsTool = ai.defineTool({
       })
     ).max(5).describe("An array of top 5 summarized news stories. Returns an empty array if no relevant articles are found or input is empty."),
     async handler(input) {
-      console.log('[summarizeNewsTool] Received input articles:', input.articles?.length);
+      console.log('[summarizeNewsTool] Received input articles count:', input.articles?.length);
       if (!input.articles || input.articles.length === 0) {
         console.log('[summarizeNewsTool] No articles to process, returning empty array.');
         return [];
       }
 
+      // Simplified: take the first up to 5 articles, assign priority, and summarize.
       const articlesToConsider = input.articles.slice(0, 5);
 
       const selectedArticles = articlesToConsider.map((article, index) => {
         let summary = article.content;
-        if (summary.length > 200) {
+        // Basic summary: if content is long, truncate. If very short, make it a bit more descriptive.
+        if (summary.length > 200) { // Max length for a summary
           summary = summary.substring(0, 197) + "...";
         } else if (summary.length < 30 && article.title.length > summary.length) {
+            // If content is very short (less than 30 chars) and title is longer, use title as a base
             summary = `Read more about: "${article.title}".`;
         } else if (summary.length < 30) {
              summary = "Brief update. Click link for more details.";
@@ -151,12 +155,12 @@ const summarizeNewsTool = ai.defineTool({
 
         return {
           title: article.title,
-          summary: summary,
+          summary: summary, // Use the (potentially truncated) content as summary
           url: article.url,
-          priority: index + 1, 
+          priority: index + 1, // Simple priority based on order received
         };
       });
-      console.log('[summarizeNewsTool] Produced articles:', selectedArticles.length);
+      console.log('[summarizeNewsTool] Produced articles count:', selectedArticles.length);
       return selectedArticles;
     },
   });
@@ -324,10 +328,12 @@ const customizeNewsletterFlow = ai.defineFlow(
     }
 
 
+    // Ensure dressMyRunSuggestion is a valid array of objects or an empty array.
     if (!Array.isArray(output.dressMyRunSuggestion)) {
         console.warn("[customizeNewsletterFlow] AI output for dressMyRunSuggestion was not an array, attempting to correct. Received:", output.dressMyRunSuggestion);
         if (typeof output.dressMyRunSuggestion === 'string') {
             try {
+                // Attempt to parse if AI mistakenly stringified an array of objects
                 const parsedSuggestion = JSON.parse(output.dressMyRunSuggestion as string);
                 if (Array.isArray(parsedSuggestion)) {
                     output.dressMyRunSuggestion = parsedSuggestion.filter(item =>
@@ -336,16 +342,17 @@ const customizeNewsletterFlow = ai.defineFlow(
                         'category' in item && typeof item.category === 'string'
                     );
                 } else {
-                    output.dressMyRunSuggestion = [];
+                    output.dressMyRunSuggestion = []; // Parsed, but not an array of valid items
                 }
             } catch (e) {
                 console.error("[customizeNewsletterFlow] Could not parse string dressMyRunSuggestion from AI into array:", e);
-                output.dressMyRunSuggestion = [];
+                output.dressMyRunSuggestion = []; // Parsing failed
             }
         } else {
-             output.dressMyRunSuggestion = [];
+             output.dressMyRunSuggestion = []; // Not a string, not an array, default to empty
         }
     } else {
+        // It's an array, filter it for valid items
         output.dressMyRunSuggestion = output.dressMyRunSuggestion.filter(item =>
             typeof item === 'object' && item !== null &&
             'item' in item && typeof item.item === 'string' &&
@@ -353,6 +360,7 @@ const customizeNewsletterFlow = ai.defineFlow(
         );
     }
     
+    // If weather had an error, dressMyRunSuggestion must be empty.
     const weatherInput = input.weather;
     const weatherHasError = typeof weatherInput === 'object' && weatherInput && 'error' in weatherInput && typeof weatherInput.error === 'string' && weatherInput.error.length > 0;
     if (weatherHasError && output.dressMyRunSuggestion.length > 0) {
