@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { Zap, CalendarDays } from "lucide-react"; 
+import { Zap, CalendarDays, MessageSquareText } from "lucide-react"; 
 import { Button } from "@/components/ui/button";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,16 @@ export function Header() {
             )}
           >
             Profile
+          </Link>
+          <Link
+            href="/feedback"
+            className={cn(
+              "transition-colors hover:text-foreground/80 flex items-center gap-1",
+              pathname === "/feedback" ? "text-foreground font-medium" : "text-foreground/60"
+            )}
+          >
+            <MessageSquareText className="h-4 w-4" />
+            Feedback
           </Link>
         </nav>
         <div className="flex items-center">
