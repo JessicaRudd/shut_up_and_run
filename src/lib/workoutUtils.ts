@@ -125,7 +125,7 @@ export const isPlanEndingSoon = (profile: UserProfile | null): boolean => {
   const today = startOfDay(new Date());
   const daysRemaining = differenceInCalendarDays(endDate, today);
 
-  return daysRemaining <= 7 && daysRemaining >=0; // Plan ends within the next 7 days (inclusive of today)
+  return daysRemaining <= 0; // Plan ends today or has already ended
 };
 
 export const isPlanEnded = (profile: UserProfile | null): boolean => {
