@@ -212,20 +212,27 @@ export function DashboardContentOrchestrator({}: DashboardContentOrchestratorPro
         console.log(`[Orchestrator] Cache check: Fetched Date Match: ${cachedEntry.fetchedDate === todayStr} (Cached: ${cachedEntry.fetchedDate}, Today: ${todayStr})`);
         console.log(`[Orchestrator] Cache check: Profile Snapshots Match: ${profileSnapshotsMatch}`);
 
+        const weatherWasUnavailableInCache = cachedEntry.data?.weather?.toLowerCase().includes("unavailable") || 
+                                             cachedEntry.data?.weather?.toLowerCase().includes("error") ||
+                                             cachedEntry.data?.weather?.toLowerCase().includes("could not retrieve");
 
-        if (cachedEntry.fetchedDate === todayStr && profileSnapshotsMatch) {
-          console.log("[Orchestrator] Using cached newsletter data for today.");
+
+        if (cachedEntry.fetchedDate === todayStr && profileSnapshotsMatch && !weatherWasUnavailableInCache) {
+          console.log("[Orchestrator] Using cached newsletter data for today (weather available).");
           setNewsletterData(cachedEntry.data);
           setOrchestratorLoading(false);
           setError(null); // Clear any previous errors if cache is now valid
           return; 
         } else {
-          console.log("[Orchestrator] Cache is stale or profile mismatch. Will fetch fresh data.");
+          console.log("[Orchestrator] Cache is stale or profile mismatch or weather was unavailable. Will fetch fresh data.");
           if (cachedEntry.fetchedDate !== todayStr) console.log(` - Cache Reason: Date mismatch (Cached: ${cachedEntry.fetchedDate}, Today: ${todayStr})`);
           if (!profileSnapshotsMatch) {
             console.log(` - Cache Reason: Profile snapshot mismatch.`);
             console.log("   Cached Snapshot:", cachedEntry.profileSnapshot);
             console.log("   Current Snapshot:", currentProfileSnapshot);
+          }
+          if (weatherWasUnavailableInCache) {
+            console.log(` - Cache Reason: Cached weather was unavailable. Attempting refresh.`);
           }
         }
       } catch (e) {
