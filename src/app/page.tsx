@@ -1,3 +1,4 @@
+
 "use client";
 
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -10,9 +11,9 @@ import { AlertTriangle } from "lucide-react";
 import { DashboardContentOrchestrator } from "@/components/dashboard/DashboardContentOrchestrator";
 
 export default function DashboardPage() {
-  const { userProfile, loading, isProfileComplete } = useUserProfile();
+  const { loading: userProfileLoading, isProfileComplete } = useUserProfile();
 
-  if (loading) {
+  if (userProfileLoading) {
     return (
       <MainLayout>
         <div className="space-y-6">
@@ -52,7 +53,10 @@ export default function DashboardPage() {
 
   return (
     <MainLayout>
-      <DashboardContentOrchestrator userProfile={userProfile} />
+      {/* userProfile prop is removed as Orchestrator now gets it from context */}
+      <DashboardContentOrchestrator />
     </MainLayout>
   );
 }
+
+    

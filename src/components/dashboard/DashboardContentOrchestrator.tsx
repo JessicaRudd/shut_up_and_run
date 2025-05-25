@@ -16,9 +16,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { TRAINING_PLANS } from "@/lib/constants";
 import { format } from "date-fns";
+import { useUserProfile } from "@/contexts/UserProfileContext"; // Import useUserProfile
 
 interface DashboardContentOrchestratorProps {
-  userProfile: UserProfile;
+  // userProfile prop is no longer needed, will be fetched from context
 }
 
 interface CachedNewsletterData {
@@ -31,6 +32,7 @@ interface CachedNewsletterData {
     runningLevel: UserProfile['runningLevel'];
     trainingPlan: UserProfile['trainingPlan'];
     planStartDate?: string;
+    raceDate?: string;
     newsSearchPreferences?: NewsSearchCategory[];
   };
 }
@@ -45,26 +47,29 @@ const createProfileSnapshot = (profile: UserProfile): CachedNewsletterData['prof
   runningLevel: profile.runningLevel,
   trainingPlan: profile.trainingPlan,
   planStartDate: profile.planStartDate,
-  newsSearchPreferences: profile.newsSearchPreferences ? [...profile.newsSearchPreferences].sort() : [], // Sort for consistent comparison
+  raceDate: profile.raceDate,
+  newsSearchPreferences: profile.newsSearchPreferences ? [...profile.newsSearchPreferences].sort() : [],
 });
 
 
-export function DashboardContentOrchestrator({ userProfile }: DashboardContentOrchestratorProps) {
+export function DashboardContentOrchestrator({}: DashboardContentOrchestratorProps) {
+  const { userProfile, loading: userProfileLoading, isProfileComplete } = useUserProfile(); // Get profile from context
+
   const [newsletterData, setNewsletterData] = useState<CustomizeNewsletterOutput | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [orchestratorLoading, setOrchestratorLoading] = useState(true); // Separate loading state for orchestrator
   const [error, setError] = useState<string | null>(null);
   const [weatherErrorForAI, setWeatherErrorForAI] = useState<string | null>(null);
-  // lastFetchedDate is now part of the cached object logic, not a separate state for triggering fetches.
+
 
   const fetchNewsletterDataAndUpdateState = useCallback(async (currentDateStr: string, currentProfileSnapshotForCache: CachedNewsletterData['profileSnapshot']) => {
     if (!userProfile.name || !userProfile.location || !userProfile.weatherUnit) {
       setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
       setNewsletterData(null);
-      setLoading(false);
+      setOrchestratorLoading(false);
       return;
     }
 
-    setLoading(true);
+    setOrchestratorLoading(true);
     setError(null);
     setWeatherErrorForAI(null);
     console.log("[Orchestrator] Starting to fetch fresh newsletter data for date:", currentDateStr);
@@ -116,7 +121,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
       
       console.log("[Orchestrator] Input for customizeNewsletter AI flow:", JSON.stringify(inputForAI, null, 2));
       const result = await customizeNewsletter(inputForAI);
-      console.log("[Orchestrator] Result from customizeNewsletter AI flow:", result);
+      console.log("[Orchestrator] Result from customizeNewsletter AI flow:", JSON.stringify(result, null, 2));
       
       // Cache the newly fetched data
       const cacheEntry: CachedNewsletterData = {
@@ -125,7 +130,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
         profileSnapshot: currentProfileSnapshotForCache,
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(cacheEntry));
-      console.log("[Orchestrator] Newsletter data cached successfully.");
+      console.log("[Orchestrator] Newsletter data cached successfully with snapshot:", currentProfileSnapshotForCache);
 
       setNewsletterData(result);
     } catch (err: any) {
@@ -152,21 +157,46 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
       }
       setNewsletterData(null);
     } finally {
-      console.log("[Orchestrator] Finished fetching newsletter data. Setting loading to false.");
-      setLoading(false);
+      console.log("[Orchestrator] Finished fetching newsletter data. Setting orchestrator loading to false.");
+      setOrchestratorLoading(false);
     }
-  }, [userProfile]); // Dependencies reflect what's used from userProfile to build inputForAI
+  }, [userProfile]); 
 
   useEffect(() => {
+    // Wait for userProfile to be loaded from context
+    if (userProfileLoading) {
+      console.log("[Orchestrator] Waiting for user profile to load...");
+      setOrchestratorLoading(true); // Keep orchestrator loading true
+      return;
+    }
+     console.log("[Orchestrator] User profile loaded. isProfileComplete:", isProfileComplete, "Profile:", userProfile);
+
+    if (!isProfileComplete) {
+      console.log("[Orchestrator] Profile is not complete. Prompting user.");
+      setError("Please complete your profile fully (including name, location, weather unit, training plan, etc.) to load the dashboard.");
+      setNewsletterData(null);
+      setOrchestratorLoading(false);
+      return;
+    }
+    
+    // If error was due to incomplete profile, but now it is complete, clear that specific error.
+    if (error && error.startsWith("Please complete your profile")) {
+        setError(null);
+    }
+
+
     const todayStr = format(new Date(), "yyyy-MM-dd");
     const currentProfileSnapshot = createProfileSnapshot(userProfile);
 
-    console.log("[Orchestrator] useEffect triggered. Today:", todayStr, "Current Profile Snapshot:", currentProfileSnapshot);
+    console.log("[Orchestrator] useEffect triggered. Today:", todayStr);
+    console.log("[Orchestrator] Current Profile Snapshot for cache check:", currentProfileSnapshot);
+
 
     const cachedEntryJson = localStorage.getItem(CACHE_KEY);
     if (cachedEntryJson) {
       try {
         const cachedEntry: CachedNewsletterData = JSON.parse(cachedEntryJson);
+        console.log("[Orchestrator] Found cached entry:", cachedEntry);
         
         const profileSnapshotsMatch = 
           cachedEntry.profileSnapshot.name === currentProfileSnapshot.name &&
@@ -175,59 +205,49 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
           cachedEntry.profileSnapshot.runningLevel === currentProfileSnapshot.runningLevel &&
           cachedEntry.profileSnapshot.trainingPlan === currentProfileSnapshot.trainingPlan &&
           cachedEntry.profileSnapshot.planStartDate === currentProfileSnapshot.planStartDate &&
+          cachedEntry.profileSnapshot.raceDate === currentProfileSnapshot.raceDate &&
           JSON.stringify(cachedEntry.profileSnapshot.newsSearchPreferences?.sort()) === JSON.stringify(currentProfileSnapshot.newsSearchPreferences?.sort());
+
+        console.log(`[Orchestrator] Cache check: Fetched Date Match: ${cachedEntry.fetchedDate === todayStr} (Cached: ${cachedEntry.fetchedDate}, Today: ${todayStr})`);
+        console.log(`[Orchestrator] Cache check: Profile Snapshots Match: ${profileSnapshotsMatch}`);
+
 
         if (cachedEntry.fetchedDate === todayStr && profileSnapshotsMatch) {
           console.log("[Orchestrator] Using cached newsletter data for today.");
           setNewsletterData(cachedEntry.data);
-          setLoading(false);
-          setError(null);
-          return; // Exit: valid cache found
+          setOrchestratorLoading(false);
+          setError(null); // Clear any previous errors if cache is now valid
+          return; 
         } else {
           console.log("[Orchestrator] Cache is stale or profile mismatch. Will fetch fresh data.");
           if (cachedEntry.fetchedDate !== todayStr) console.log(` - Cache Reason: Date mismatch (Cached: ${cachedEntry.fetchedDate}, Today: ${todayStr})`);
-          if (!profileSnapshotsMatch) console.log(` - Cache Reason: Profile snapshot mismatch.`);
+          if (!profileSnapshotsMatch) {
+            console.log(` - Cache Reason: Profile snapshot mismatch.`);
+            console.log("   Cached Snapshot:", cachedEntry.profileSnapshot);
+            console.log("   Current Snapshot:", currentProfileSnapshot);
+          }
         }
       } catch (e) {
         console.error("[Orchestrator] Error parsing cached newsletter data:", e);
-        localStorage.removeItem(CACHE_KEY); // Clear corrupted cache
+        localStorage.removeItem(CACHE_KEY); 
       }
     } else {
         console.log("[Orchestrator] No cache found. Will fetch fresh data.");
     }
-
-    // If cache not used or stale, proceed to check profile and potentially fetch
-    if (!userProfile.name || !userProfile.location || !userProfile.weatherUnit) {
-      if (!error) {
-        setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
-      }
-      if (newsletterData) setNewsletterData(null);
-      setLoading(false);
-      return;
-    }
     
-    if (error === "Please complete your profile including name, location, and weather unit to load the dashboard.") {
-        setError(null);
-    }
-
     // Fetch fresh data
     fetchNewsletterDataAndUpdateState(todayStr, currentProfileSnapshot);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    userProfile.name, 
-    userProfile.location, 
-    userProfile.weatherUnit, 
-    userProfile.runningLevel, 
-    userProfile.trainingPlan, 
-    userProfile.planStartDate, 
-    userProfile.newsSearchPreferences, // This should be the actual array for comparison
-    // fetchNewsletterDataAndUpdateState is memoized based on userProfile, so it's okay here.
-    // Direct userProfile fields ensure re-evaluation if those specific fields change.
+    userProfileLoading, // Primary gate
+    isProfileComplete,
+    userProfile, // Full userProfile to recalculate snapshot and pass to fetch function
+    fetchNewsletterDataAndUpdateState, // Memoized fetch function
+    error // To clear specific error if profile becomes complete
   ]);
 
 
-  if (loading && !newsletterData && !error) {
+  if (userProfileLoading || (orchestratorLoading && !newsletterData && !error)) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-28 w-full" />
@@ -251,7 +271,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     );
   }
   
-  if (!loading && !newsletterData) {
+  if (!orchestratorLoading && !newsletterData) { // Check orchestratorLoading here
      return (
       <Alert variant="default" className="mt-6 border-primary/50 text-primary-foreground bg-primary/10">
         <AlertTriangle className="h-5 w-5 text-primary" />
@@ -259,7 +279,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
         <AlertDescription className="text-foreground">
           We are having trouble generating your personalized content at the moment. This could be due to:
           <ul className="list-disc list-inside mt-2 space-y-1">
-            <li>Your profile not being fully completed (check name, location, weather unit).</li>
+            <li>Your profile not being fully completed (check all fields, especially name, location, weather unit, and training plan selections).</li>
             <li>Temporary issues with external services (weather, news search). Please ensure API keys are correctly set in the environment if you are the developer.</li>
             <li>Temporary issues with the AI content generation service.</li>
           </ul>
@@ -270,7 +290,7 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     );
   }
   
-  if (!newsletterData) {
+  if (!newsletterData) { // Should be caught by above, but as a final fallback
     return (
       <div className="text-center py-10">Preparing your dashboard... If this takes too long, please refresh or check back later.</div>
     );
@@ -299,3 +319,5 @@ export function DashboardContentOrchestrator({ userProfile }: DashboardContentOr
     </div>
   );
 }
+
+    
