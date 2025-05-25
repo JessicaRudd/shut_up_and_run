@@ -17,6 +17,7 @@ import { AlertTriangle } from "lucide-react";
 import { TRAINING_PLANS } from "@/lib/constants";
 import { format } from "date-fns";
 import { useUserProfile } from "@/contexts/UserProfileContext"; // Import useUserProfile
+import { fetchGoogleRunningNewsTool } from "@/ai/tools/fetch-google-running-news-tool";
 
 interface DashboardContentOrchestratorProps {
   // userProfile prop is no longer needed, will be fetched from context
@@ -160,7 +161,7 @@ export function DashboardContentOrchestrator({}: DashboardContentOrchestratorPro
       console.log("[Orchestrator] Finished fetching newsletter data. Setting orchestrator loading to false.");
       setOrchestratorLoading(false);
     }
-  }, [userProfile]); 
+  }, [userProfile]); // Added userProfile here
 
   useEffect(() => {
     // Wait for userProfile to be loaded from context
@@ -173,7 +174,7 @@ export function DashboardContentOrchestrator({}: DashboardContentOrchestratorPro
 
     if (!isProfileComplete) {
       console.log("[Orchestrator] Profile is not complete. Prompting user.");
-      setError("Please complete your profile fully (including name, location, weather unit, training plan, etc.) to load the dashboard.");
+      setError("Please complete your profile fully (including name, location, weather unit, and training plan selections) to load the dashboard.");
       setNewsletterData(null);
       setOrchestratorLoading(false);
       return;
@@ -206,7 +207,7 @@ export function DashboardContentOrchestrator({}: DashboardContentOrchestratorPro
           cachedEntry.profileSnapshot.trainingPlan === currentProfileSnapshot.trainingPlan &&
           cachedEntry.profileSnapshot.planStartDate === currentProfileSnapshot.planStartDate &&
           cachedEntry.profileSnapshot.raceDate === currentProfileSnapshot.raceDate &&
-          JSON.stringify(cachedEntry.profileSnapshot.newsSearchPreferences?.sort()) === JSON.stringify(currentProfileSnapshot.newsSearchPreferences?.sort());
+          JSON.stringify(cachedEntry.profileSnapshot.newsSearchPreferences) === JSON.stringify(currentProfileSnapshot.newsSearchPreferences); // newsSearchPreferences are already sorted in createProfileSnapshot
 
         console.log(`[Orchestrator] Cache check: Fetched Date Match: ${cachedEntry.fetchedDate === todayStr} (Cached: ${cachedEntry.fetchedDate}, Today: ${todayStr})`);
         console.log(`[Orchestrator] Cache check: Profile Snapshots Match: ${profileSnapshotsMatch}`);
@@ -319,5 +320,3 @@ export function DashboardContentOrchestrator({}: DashboardContentOrchestratorPro
     </div>
   );
 }
-
-    
