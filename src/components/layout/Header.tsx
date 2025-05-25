@@ -73,7 +73,7 @@ export function Header() {
             data-outline-color="#000000" // Black outline
             data-font-color="#000000"    // Black text
             data-coffee-color="#FFDD00"  // Yellow coffee icon
-            strategy="lazyOnload"    // Load after page content is ready
+            strategy="afterInteractive" // Changed strategy
           />
         </div>
       </div>
