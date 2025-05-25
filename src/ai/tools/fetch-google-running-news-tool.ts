@@ -86,51 +86,52 @@ const fetchGoogleRunningNewsTool = ai.defineTool(
       });
     }
     
-    if (searchKeywords.length > 0) {
-      query += ` ${searchKeywords.join(" OR ")}`; // Combine specific keywords if any
-    }
+ if (searchKeywords.length > 0) {
+ query += ` ${searchKeywords.join(" OR ")}`; // Combine specific keywords if any
+ }
+
+// Limit results to recent news, e.g., last 7 days.
+// Google Custom Search API uses `dateRestrict` with `d[number]` for days, `w[number]` for weeks.
+// Let's aim for news within the last week.
+const dateRestrict = "w1";
+
+// Google Custom Search API's dateRestrict is approximate and 'm3' is the closest option for filtering within the last 3 months. It cannot filter for an exact 3-month period.
+ try {
+  console.log(`[fetchGoogleRunningNewsTool] Performing Google Search with query: "${query}", dateRestrict: "${dateRestrict}"`);
+  const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+    params: {
+      key: apiKey,
+      cx: cx,
+      q: query,
+      num: 10, // Request 10 results, AI will pick top 5 later
+      // sort: 'date', // Sorting by date can be useful
+      dateRestrict: dateRestrict, 
+    },
+    headers: { 'User-Agent': 'ShutUpAndRunApp/1.0 (GenkitTool)' },
+  });
+
+  if (response.data && response.data.items) {
+    const articles: NewsArticle[] = response.data.items.map((item: any) => ({
+      title: item.title,
+      link: item.link,
+      snippet: item.snippet,
+    })).filter((article: NewsArticle) => article.link && article.title && article.snippet); // Basic validation
     
-    // Limit results to recent news, e.g., last 7 days.
-    // Google Custom Search API uses `dateRestrict` with `d[number]` for days, `w[number]` for weeks.
-    // Let's aim for news within the last week.
-    const dateRestrict = "w1"; 
-
-    try {
-      console.log(`[fetchGoogleRunningNewsTool] Performing Google Search with query: "${query}", dateRestrict: "${dateRestrict}"`);
-      const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
-        params: {
-          key: apiKey,
-          cx: cx,
-          q: query,
-          num: 10, // Request 10 results, AI will pick top 5 later
-          // sort: 'date', // Sorting by date can be useful
-          dateRestrict: dateRestrict, 
-        },
-        headers: { 'User-Agent': 'ShutUpAndRunApp/1.0 (GenkitTool)' },
-      });
-
-      if (response.data && response.data.items) {
-        const articles: NewsArticle[] = response.data.items.map((item: any) => ({
-          title: item.title,
-          link: item.link,
-          snippet: item.snippet,
-        })).filter((article: NewsArticle) => article.link && article.title && article.snippet); // Basic validation
-        
-        console.log(`[fetchGoogleRunningNewsTool] Found ${articles.length} articles from Google Search.`);
-        return { articles };
-      } else {
-        console.log('[fetchGoogleRunningNewsTool] No items found in Google Search response.');
-        return { articles: [], error: "No relevant news found for the selected preferences." };
-      }
-    } catch (error: any) {
-      console.error('[fetchGoogleRunningNewsTool] Error calling Google Search API:', error.response?.data?.error?.message || error.message);
-      let errorMessage = "Failed to fetch news from Google Search.";
-      if (error.response?.data?.error?.message) {
-        errorMessage += ` Details: ${error.response.data.error.message}`;
-      }
-      return { articles: [], error: errorMessage };
-    }
+    console.log(`[fetchGoogleRunningNewsTool] Found ${articles.length} articles from Google Search.`);
+    return { articles };
+  } else {
+    console.log('[fetchGoogleRunningNewsTool] No items found in Google Search response.');
+    return { articles: [], error: "No relevant news found for the selected preferences." };
   }
+} catch (error: any) {
+  console.error('[fetchGoogleRunningNewsTool] Error calling Google Search API:', error.response?.data?.error?.message || error.message);
+  let errorMessage = "Failed to fetch news from Google Search.";
+  if (error.response?.data?.error?.message) {
+    errorMessage += ` Details: ${error.response.data.error.message}`;
+  }
+  return { articles: [], error: errorMessage };
+}
+}
 );
 
 // Export a wrapper function if you intend to call this tool directly from other server code,

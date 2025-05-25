@@ -238,6 +238,13 @@ const customizeNewsletterFlow = ai.defineFlow(
             typeof story.title === 'string' &&
             typeof story.summary === 'string' &&
             typeof story.url === 'string' && 
+            // Prepend http:// if missing for uri format validation
+            (() => {
+                if (story.url && !/^https?:\/\//i.test(story.url)) {
+ output.topStories[output.topStories.indexOf(story)].url = "http://" + story.url;
+                }
+ return true; // Always return true to keep the item if other checks pass
+            })() &&
             typeof story.priority === 'number'
         ).slice(0, 5); 
     }
