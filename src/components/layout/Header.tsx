@@ -64,7 +64,7 @@ export function Header() {
             <img 
               src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
               alt="Buy Me A Coffee" 
-              style={{ height: '60px', width: '217px' }} // Applying requested dimensions. Note: !important is not standard in JSX style objects but browsers might interpret string values containing it.
+              style={{ height: '45px', width: '163px' }} // Adjusted size
             />
           </a>
         </div>
