@@ -2,9 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import Script from 'next/script'; // Import next/script
 import { Footprints, CalendarDays, MessageSquareText } from "lucide-react";
-// Removed: import { Button } from "@/components/ui/button"; // No longer using ShadCN Button for BMC
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -61,20 +59,14 @@ export function Header() {
           </Link>
         </nav>
         <div className="flex items-center">
-          {/* Buy Me A Coffee button embed */}
-          <Script
-            src="https://cdnjs.buymeacoffee.com/1.0.0/button.prod.min.js"
-            data-name="bmc-button"
-            data-slug="h9aq9muuYz"    // Your specific Buy Me A Coffee slug
-            data-color="#ff7700"      // Orange background (matches your site's --primary)
-            data-emoji=""
-            data-font="Cookie"
-            data-text="Buy me a coffee"
-            data-outline-color="#000000" // Black outline
-            data-font-color="#000000"    // Black text
-            data-coffee-color="#FFDD00"  // Yellow coffee icon
-            strategy="afterInteractive" // Changed strategy
-          />
+          {/* Buy Me A Coffee button image link */}
+          <a href="https://www.buymeacoffee.com/h9aq9muuYz" target="_blank" rel="noopener noreferrer">
+            <img 
+              src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" 
+              alt="Buy Me A Coffee" 
+              style={{ height: '45px', width: '162.75px' }} // Adjusted size to better fit the header
+            />
+          </a>
         </div>
       </div>
     </header>
