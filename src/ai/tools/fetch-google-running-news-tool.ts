@@ -105,6 +105,7 @@ const fetchGoogleRunningNewsTool = ai.defineTool(
       });
 
       if (response.data && response.data.items) {
+        console.log("[fetchGoogleRunningNewsTool] Raw Google Search API response data:", JSON.stringify(response.data, null, 2)); // Log raw response
         console.log(`[fetchGoogleRunningNewsTool] Google Search API returned ${response.data.items.length} raw items.`);
         const articles: NewsArticle[] = response.data.items.map((item: any) => ({
           title: item.title,
@@ -117,6 +118,7 @@ const fetchGoogleRunningNewsTool = ai.defineTool(
           /^https?:\/\//i.test(article.link) // Ensure link starts with http/https
         );
         
+        console.log("[fetchGoogleRunningNewsTool] Filtered articles array:", JSON.stringify(articles, null, 2)); // Log filtered articles
         console.log(`[fetchGoogleRunningNewsTool] Found ${articles.length} valid articles after filtering.`);
         return { articles };
       } else {

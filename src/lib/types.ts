@@ -13,6 +13,8 @@ export type NewsSearchCategory =
   | "nutrition" 
   | "training";
 
+export type LongRunDay = "saturday" | "sunday" | ""; // Add more if needed
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -24,6 +26,8 @@ export interface UserProfile {
   weatherUnit: WeatherUnit;
   newsletterDelivery: NewsletterDelivery;
   newsSearchPreferences?: NewsSearchCategory[];
+  runningDaysPerWeek?: number; // e.g., 3, 4, 5, 6, 7
+  longRunDay?: LongRunDay; // e.g., "saturday", "sunday"
 }
 
 // New types for structured weather forecast

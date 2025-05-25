@@ -23,11 +23,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, CheckSquare, Square } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { useUserProfile } from "@/contexts/UserProfileContext";
-import { RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS, DEFAULT_USER_PROFILE, NEWS_SEARCH_CATEGORIES } from "@/lib/constants";
-import type { UserProfile, RunningLevel, TrainingPlan as TrainingPlanType, WeatherUnit, NewsletterDelivery, NewsSearchCategory } from "@/lib/types";
+import { 
+  RUNNING_LEVELS, 
+  TRAINING_PLANS, 
+  WEATHER_UNITS, 
+  NEWSLETTER_DELIVERY_OPTIONS, 
+  DEFAULT_USER_PROFILE, 
+  NEWS_SEARCH_CATEGORIES,
+  RUNNING_DAYS_OPTIONS,
+  LONG_RUN_DAY_OPTIONS
+} from "@/lib/constants";
+import type { UserProfile, RunningLevel, TrainingPlan as TrainingPlanType, WeatherUnit, NewsletterDelivery, NewsSearchCategory, LongRunDay } from "@/lib/types";
 import { useEffect, useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 import { v4 as uuidv4 } from 'uuid';
@@ -36,6 +45,9 @@ import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 
 const newsSearchCategoryValues = NEWS_SEARCH_CATEGORIES.map(c => c.value) as [NewsSearchCategory, ...NewsSearchCategory[]];
+const runningDaysValues = RUNNING_DAYS_OPTIONS.map(d => d.value) as [number, ...number[]];
+const longRunDayValues = LONG_RUN_DAY_OPTIONS.map(d => d.value) as [LongRunDay, ...LongRunDay[]];
+
 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -45,6 +57,10 @@ const formSchema = z.object({
   }),
   trainingPlan: z.enum(["5k", "10k", "half-marathon", "marathon", "ultra"], {
     errorMap: () => ({ message: "Please select a training plan." }),
+  }),
+  runningDaysPerWeek: z.coerce.number().min(3).max(7, {message: "Please select how many days per week you plan to run."}),
+  longRunDay: z.enum(longRunDayValues, {
+    errorMap: () => ({ message: "Please select your preferred long run day."}),
   }),
   planStartDate: z.string().optional(),
   raceDate: z.string().optional(),
@@ -75,6 +91,8 @@ export function UserProfileForm() {
       location: "",
       runningLevel: undefined, 
       trainingPlan: undefined, 
+      runningDaysPerWeek: DEFAULT_USER_PROFILE.runningDaysPerWeek,
+      longRunDay: DEFAULT_USER_PROFILE.longRunDay,
       planStartDate: undefined,
       raceDate: undefined,
       weatherUnit: DEFAULT_USER_PROFILE.weatherUnit,
@@ -120,7 +138,9 @@ export function UserProfileForm() {
         name: userProfile.name || "", 
         location: userProfile.location || "", 
         runningLevel: userProfile.runningLevel, 
-        trainingPlan: userProfile.trainingPlan, 
+        trainingPlan: userProfile.trainingPlan,
+        runningDaysPerWeek: userProfile.runningDaysPerWeek || DEFAULT_USER_PROFILE.runningDaysPerWeek,
+        longRunDay: userProfile.longRunDay || DEFAULT_USER_PROFILE.longRunDay,
         planStartDate: planStartDateForForm,
         raceDate: userProfile.raceDate,
         weatherUnit: userProfile.weatherUnit,
@@ -140,11 +160,15 @@ export function UserProfileForm() {
     }
 
     const updatedProfile: UserProfile = {
+      ...DEFAULT_USER_PROFILE, // Start with defaults to ensure all fields are present
+      ...userProfile, // Overlay existing profile to preserve ID and other potentially missing fields
       id: userProfile.id || uuidv4(),
       name: values.name,
       location: values.location,
       runningLevel: values.runningLevel,
       trainingPlan: values.trainingPlan,
+      runningDaysPerWeek: values.runningDaysPerWeek,
+      longRunDay: values.longRunDay,
       planStartDate: finalPlanStartDate,
       raceDate: values.raceDate,
       weatherUnit: values.weatherUnit,
@@ -238,6 +262,42 @@ export function UserProfileForm() {
                 </SelectContent>
               </Select>
               <FormDescription>Choose a plan. Selecting a race date below will adjust the plan's start date.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        
+        <FormField
+          control={form.control}
+          name="runningDaysPerWeek"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Running Days Per Week</FormLabel>
+              <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select number of running days" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {RUNNING_DAYS_OPTIONS.map((option) => (<SelectItem key={option.value} value={option.value.toString()}>{option.label}</SelectItem>))}
+                </SelectContent>
+              </Select>
+              <FormDescription>How many days you want to run each week.</FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="longRunDay"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Preferred Long Run Day</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select preferred long run day" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {LONG_RUN_DAY_OPTIONS.map((option) => (<SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>))}
+                </SelectContent>
+              </Select>
+              <FormDescription>The day of the week you prefer for your longest run.</FormDescription>
               <FormMessage />
             </FormItem>
           )}

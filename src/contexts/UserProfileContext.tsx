@@ -1,8 +1,8 @@
 
 "use client";
 
-import type { UserProfile, RunningLevel, TrainingPlan, WeatherUnit, NewsletterDelivery, NewsSearchCategory } from "@/lib/types";
-import { DEFAULT_USER_PROFILE, RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS, NEWS_SEARCH_CATEGORIES } from "@/lib/constants";
+import type { UserProfile, RunningLevel, TrainingPlan, WeatherUnit, NewsletterDelivery, NewsSearchCategory, LongRunDay } from "@/lib/types";
+import { DEFAULT_USER_PROFILE, RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS, NEWS_SEARCH_CATEGORIES, RUNNING_DAYS_OPTIONS, LONG_RUN_DAY_OPTIONS } from "@/lib/constants";
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
 interface UserProfileContextType {
@@ -19,13 +19,16 @@ const checkProfileCompleteness = (profile: UserProfile | null): boolean => {
   if (!profile) return false;
   // RaceDate is optional. PlanStartDate is also optional but often derived or defaulted.
   // newsSearchPreferences are optional.
+  // runningDaysPerWeek and longRunDay now have defaults, so they are always "set".
   return !!(
     profile.name &&
     profile.location &&
     profile.runningLevel && 
     profile.trainingPlan && 
     profile.weatherUnit &&
-    profile.newsletterDelivery
+    profile.newsletterDelivery &&
+    profile.runningDaysPerWeek && // Added check
+    profile.longRunDay // Added check
   );
 };
 
@@ -61,6 +64,12 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
           newsSearchPreferences: Array.isArray(storedProfile.newsSearchPreferences)
                           ? storedProfile.newsSearchPreferences.filter(pref => NEWS_SEARCH_CATEGORIES.some(cat => cat.value === pref))
                           : DEFAULT_USER_PROFILE.newsSearchPreferences,
+          runningDaysPerWeek: RUNNING_DAYS_OPTIONS.find(rd => rd.value === storedProfile.runningDaysPerWeek)
+                          ? storedProfile.runningDaysPerWeek!
+                          : DEFAULT_USER_PROFILE.runningDaysPerWeek,
+          longRunDay: LONG_RUN_DAY_OPTIONS.find(lrd => lrd.value === storedProfile.longRunDay)
+                          ? storedProfile.longRunDay!
+                          : DEFAULT_USER_PROFILE.longRunDay,
           id: storedProfile.id || DEFAULT_USER_PROFILE.id,
         };
       }
@@ -98,6 +107,12 @@ export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
       newsSearchPreferences: Array.isArray(newProfileCandidate.newsSearchPreferences)
                       ? newProfileCandidate.newsSearchPreferences.filter(pref => NEWS_SEARCH_CATEGORIES.some(cat => cat.value === pref))
                       : DEFAULT_USER_PROFILE.newsSearchPreferences,
+      runningDaysPerWeek: RUNNING_DAYS_OPTIONS.find(rd => rd.value === newProfileCandidate.runningDaysPerWeek)
+                      ? newProfileCandidate.runningDaysPerWeek
+                      : DEFAULT_USER_PROFILE.runningDaysPerWeek,
+      longRunDay: LONG_RUN_DAY_OPTIONS.find(lrd => lrd.value === newProfileCandidate.longRunDay)
+                      ? newProfileCandidate.longRunDay
+                      : DEFAULT_USER_PROFILE.longRunDay,
     };
 
     setUserProfile(validatedProfile);
