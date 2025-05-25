@@ -3,44 +3,65 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  Shirt, Thermometer, Sun, Wind, CloudRain, Snowflake, Sparkles, ChevronsRight, Footprints, Glasses, Hand,
-  CheckSquare, HelpCircle // HelpCircle for unknown, CheckSquare as generic accessory
+  Shirt, // Main section icon & for shirt items
+  Sun,   // For visor, sunglasses
+  Wind,  // For jackets, windbreakers
+  CloudRain, // For rain-jackets
+  Footprints, // For lower body wear, shoes, socks
+  Glasses, // Specifically for sunglasses
+  Hand,  // For gloves, mittens
+  UserCircle, // For hats, headbands, general headwear
+  CheckSquare, // For generic accessories
+  HelpCircle // Fallback for unknown categories
 } from "lucide-react"; 
-import type { DressMyRunItem, DressMyRunItemCategory } from "@/ai/flows/customize-newsletter-content";
+import type { DressMyRunItem } from "@/ai/flows/customize-newsletter-content";
 
 interface DressMyRunSectionProps {
   suggestion: DressMyRunItem[] | null | undefined | string; // Allow string for defensive check
 }
 
-const categoryToIconMap: Record<string, React.ElementType> = { // Use string for key
-  "hat": Sparkles, 
-  "visor": Sparkles, // Could be same as hat or more specific like a sun icon variant
+const categoryToIconMap: Record<string, React.ElementType> = {
+  "hat": UserCircle,
+  "visor": Sun,
   "sunglasses": Glasses,
-  "headband": Sparkles, // Similar to hat
+  "headband": UserCircle,
   "shirt": Shirt,
-  "tank-top": Shirt, 
-  "long-sleeve": Shirt,
-  "base-layer": Shirt, 
-  "mid-layer": Shirt, 
-  "jacket": Wind, // Generic jacket icon, or Thermometer if for warmth
-  "vest": Shirt, // Consider a specific vest icon if available or needed
+  "tank-top": Shirt, // Using Shirt as a general top
+  "long-sleeve": Shirt, // Using Shirt as a general top
+  "base-layer": Shirt, // Using Shirt as a general top
+  "mid-layer": Shirt, // Using Shirt as a general top
+  "jacket": Wind, // General jacket
+  "vest": Shirt, // No specific vest icon, using Shirt as upper body garment
   "windbreaker": Wind,
   "rain-jacket": CloudRain,
   "shorts": Footprints, // Representing lower body wear
-  "capris": Footprints,
-  "tights": Footprints,
-  "pants": Footprints,
+  "capris": Footprints, // Representing lower body wear
+  "tights": Footprints, // Representing lower body wear
+  "pants": Footprints, // Representing lower body wear
   "gloves": Hand,
   "mittens": Hand,
-  "socks": Footprints, 
-  "shoes": Footprints, 
-  "gaiter": Sparkles, // Or Thermometer for warmth
-  "balaclava": Sparkles, // Or Thermometer for warmth
-  "accessory": CheckSquare, 
+  "socks": Footprints, // Representing footwear related
+  "shoes": Footprints, // Representing footwear
+  "gaiter": UserCircle, // Often neck/headwear
+  "balaclava": UserCircle, // Headwear
+  "accessory": CheckSquare, // Generic accessory
 };
 
-const getIconForCategory = (category: string): React.ElementType => { // Category is now string
-  const lowerCategory = category.toLowerCase().trim();
+const getIconForCategory = (category: string): React.ElementType => {
+  const lowerCategory = category.toLowerCase().trim().replace('-', ' '); // Normalize hyphens too
+  
+  // Direct match
+  if (categoryToIconMap[lowerCategory]) {
+    return categoryToIconMap[lowerCategory];
+  }
+
+  // Handle cases where category might be "long sleeve shirt" vs "long-sleeve"
+  if (lowerCategory.includes("shirt") || lowerCategory.includes("top")) return Shirt;
+  if (lowerCategory.includes("short") || lowerCategory.includes("pant") || lowerCategory.includes("tight")) return Footprints;
+  if (lowerCategory.includes("jacket")) return Wind;
+  if (lowerCategory.includes("hat") || lowerCategory.includes("cap") || lowerCategory.includes("beanie") || lowerCategory.includes("head")) return UserCircle;
+
+
   return categoryToIconMap[lowerCategory] || HelpCircle; // Default to HelpCircle if no match
 };
 
@@ -57,7 +78,7 @@ export function DressMyRunSection({ suggestion }: DressMyRunSectionProps) {
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground">
-            Clothing suggestions are in an unexpected format. AI might have provided a plain string.
+            Clothing suggestions are in an unexpected format.
           </p>
           <p className="text-sm mt-2">Raw suggestion: {suggestion}</p>
         </CardContent>
@@ -122,5 +143,3 @@ export function DressMyRunSection({ suggestion }: DressMyRunSectionProps) {
     </Card>
   );
 }
-
-    
