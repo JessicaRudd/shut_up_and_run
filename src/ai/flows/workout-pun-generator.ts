@@ -6,6 +6,7 @@
  * - generateWorkoutPunGreeting - A function that generates the greeting.
  * - WorkoutPunGreetingInput - The input type for the generateWorkoutPunGreeting function.
  * - WorkoutPunGreetingOutput - The return type for the generateWorkoutPunGreeting function.
+ * - workoutPunGreetingFlow - The Genkit flow object for use as a tool.
  */
 
 import {ai} from '@/ai/genkit';
@@ -36,7 +37,7 @@ const prompt = ai.definePrompt({
   Example Output: Hey, {{{userName}}}! Lace up your shoes and get ready to run. I hope your workout is a real tread! `,
 });
 
-const workoutPunGreetingFlow = ai.defineFlow(
+export const workoutPunGreetingFlow = ai.defineFlow( // Added export here
   {
     name: 'workoutPunGreetingFlow',
     inputSchema: WorkoutPunGreetingInputSchema,
