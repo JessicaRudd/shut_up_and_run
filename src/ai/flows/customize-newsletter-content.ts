@@ -139,7 +139,7 @@ const prompt = ai.definePrompt({
   prompt: `You are a personalized newsletter generator for runners for Shut Up and Run. You will generate a newsletter based on the user's preferences, training plan, and daily weather forecast.
 
   Your response MUST be in JSON format, adhering to the defined output schema. 
-  The 'topStories' field must contain exactly 5 articles.
+  The 'topStories' field must contain exactly 5 articles if news is found, otherwise an empty array.
   If the 'fetchGoogleRunningNewsTool' returns an error or no articles, then the 'topStories' field in your JSON output MUST be an empty array ([]). Do not invent news stories.
 
   Tasks to perform:
@@ -147,14 +147,14 @@ const prompt = ai.definePrompt({
 
   2. Provide local weather forecast and running recommendation:
      - The input 'weather' ({{{weather}}}) contains structured daily forecast data for {{{location}}} or an error object.
-     // - If '{{{weather.error}}}' exists in the input 'weather' object (e.g., { "error": "City not found" } ), your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present. In this error case, the 'dressMyRunSuggestion' field should be an empty array.
+     - If '{{{weather.error}}}' exists in the input 'weather' object (e.g., { "error": "City not found" } ), your output for the 'weather' field MUST BE EXACTLY: "Weather forecast for {{{location}}} is currently unavailable: {{{weather.error}}}". Do not add any other text or summarization to this 'weather' field if an error is present. In this error case, the 'dressMyRunSuggestion' field should be an empty array.
      - Otherwise (if '{{{weather.hourly}}}' exists and '{{{weather.error}}}' does not):
        - For the 'weather' output field, construct a single informative paragraph following these steps:
-       - Step 1: Present the overall daily forecast summary. This should include: Location: '{{{weather.locationName}}}', Date: '{{{weather.date}}}', General description: '{{{weather.overallDescription}}}', High and low temperatures: '{{{weather.tempMax}}}{{{weatherUnit}}}' and '{{{weather.tempMin}}}{{{weatherUnit}}}', Sunrise and sunset times: '{{{weather.sunrise}}}' and '{{{weather.sunset}}}', Average humidity: '{{{weather.humidityAvg}}}%'.
+       - Step 1: Present the overall daily forecast summary in a narrative style. Start with "Today in {{{weather.locationName}}} ({{{weather.date}}}), expect {{{weather.overallDescription}}}." Then seamlessly include the high of {{{weather.tempMax}}}{{{weatherUnit}}} and low of {{{weather.tempMin}}}{{{weatherUnit}}}. Mention sunrise at {{{weather.sunrise}}} and sunset at {{{weather.sunset}}}, and an average humidity of {{{weather.humidityAvg}}}%. Do NOT use explicit labels like 'Location:', 'Date:', 'General description:', etc. The output should be a flowing sentence. Example: "Today in Atlanta (Sunday, May 25th), expect light rain and broken clouds. The high will be 77F and the low 74F. Sunrise is at 6:30 AM, sunset at 8:38 PM, with an average humidity of 72%."
        - Step 2: Analyze the '{{{weather.hourly}}}' data (which includes 'time', 'temp', 'feelsLike', 'description', 'pop' for precipitation chance, and 'windSpeed') to recommend the BEST time of day to run.
        - Step 3: Your recommendation should be specific (e.g., "around 7 AM" or "between 4 PM and 6 PM").
        - Step 4: Clearly explain your recommendation, considering factors like moderate temperatures (not too hot/cold), low chance of precipitation ('pop'), and moderate wind. Prioritize avoiding rain and extreme temperatures.
-       - Combine the summary (Step 1) and the recommendation with explanation (Steps 2-4) into the single paragraph for the 'weather' output field.
+       - Combine the summary (Step 1) and the recommendation with explanation (Steps 2-4) into a single, coherent paragraph for the 'weather' output field.
 
   3. Display scheduled workout: The workout for today is '{{{workout}}}'. Include this in the output.
 
@@ -164,12 +164,12 @@ const prompt = ai.definePrompt({
      - From the articles returned by the tool, select up to 5 of the most relevant and interesting stories for the user.
      - For each selected story, provide a concise summary based on its snippet.
      - Assign a priority (1=highest) to each selected story.
-     - CRITICAL: If the 'fetchGoogleRunningNewsTool' returns an error or its 'articles' array is empty, the 'topStories' field in your JSON output MUST be an empty array ([]). Do NOT generate placeholder or fake news. Ensure exactly 5 stories are returned in the final output.
+     - CRITICAL: If the 'fetchGoogleRunningNewsTool' returns an error or its 'articles' array is empty, the 'topStories' field in your JSON output MUST be an empty array ([]). Do NOT generate placeholder or fake news.
 
   5. Plan end notification: If the user's training plan has ended (indicated by the workout text), include a 'planEndNotification' message. Omit if no plan end is indicated.
 
   6. Generate "Dress Your Run" suggestion for the 'dressMyRunSuggestion' field:
-     - This field MUST be a JSON array of objects. Each object MUST have "item" (string, e.g., "Lightweight t-shirt") and "category" (string, from predefined list like "shirt", "hat", "jacket", "shorts", "sunglasses", "gloves", etc. Use common, general categories).
+     - This field MUST be a JSON array of objects. Each object MUST have "item" (string, e.g., "Lightweight t-shirt") and "category" (string, from predefined list like "shirt", "hat", "jacket", "shorts", "sunglasses", "gloves", etc. Use common, general categories from this list: hat, visor, sunglasses, headband, shirt, tank-top, long-sleeve, base-layer, mid-layer, jacket, vest, windbreaker, rain-jacket, shorts, capris, tights, pants, gloves, mittens, socks, shoes, gaiter, balaclava, accessory).
      - If weather forecast was unavailable ('{{{weather.error}}}' present), 'dressMyRunSuggestion' MUST BE an empty array [].
      - Otherwise, based on weather at the 'best time to run' you identified, provide a DETAILED, ITEMIZED list of clothing recommendations.
      - Consider temperature, 'feelsLike', precipitation 'pop', 'windSpeed', and general description ('sunny', 'cloudy').
@@ -197,7 +197,6 @@ const customizeNewsletterFlow = ai.defineFlow(
   },
   async (input: CustomizeNewsletterInput): Promise<CustomizeNewsletterOutput> => {
     console.log("[customizeNewsletterFlow] Input received by the flow:", JSON.stringify(input, null, 2));
-    console.log("[customizeNewsletterFlow] Received input:", JSON.stringify(input, null, 2));
     const {output} = await prompt(input);
 
     if (!output) {
@@ -227,7 +226,6 @@ const customizeNewsletterFlow = ai.defineFlow(
       return fallbackResult;
     }
     console.log("[customizeNewsletterFlow] AI prompt produced output:", JSON.stringify(output, null, 2));
-    console.log("[customizeNewsletterFlow] Raw output from prompt:", JSON.stringify(output, null, 2));
 
 
     // Safeguard for topStories
@@ -262,6 +260,13 @@ const customizeNewsletterFlow = ai.defineFlow(
     if (weatherHasError && output.dressMyRunSuggestion.length > 0) {
         console.warn("[customizeNewsletterFlow] Weather had an error, but AI generated dressMyRunSuggestion. Overriding to empty array.");
         output.dressMyRunSuggestion = [];
+    }
+
+    // Prevent fake news if input news was empty
+    const newsToolInput = await fetchGoogleRunningNewsTool({ userLocation: input.location, searchCategories: input.newsSearchPreferences });
+    if ((!newsToolInput.articles || newsToolInput.articles.length === 0) && output.topStories.length > 0) {
+      console.warn("[customizeNewsletterFlow] News tool returned no articles, but AI generated topStories. Overriding to empty array.");
+      output.topStories = [];
     }
     
     console.log("[customizeNewsletterFlow] Returning processed output:", JSON.stringify(output, null, 2));
