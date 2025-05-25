@@ -14,7 +14,7 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import type { DailyForecastData as LibDailyForecastData, HourlyWeatherData as LibHourlyWeatherData, NewsSearchCategory } from '@/lib/types';
 import { fetchGoogleRunningNewsTool } from '@/ai/tools/fetch-google-running-news-tool';
-import { workoutPunGreetingTool } from '@/ai/flows/workout-pun-generator'; // Import the new TOOL
+import { workoutPunGreetingTool } from '@/ai/flows/workout-pun-generator'; 
 
 // Zod schema for HourlyWeatherData (mirroring lib/types)
 const HourlyWeatherDataSchema = z.object({
@@ -73,7 +73,6 @@ const DressMyRunItemSchema = z.object({
   category: z.string().describe("The general category of the clothing item. Examples: 'hat', 'shirt', 'shorts', 'jacket', 'sunglasses', 'gloves', 'accessory'. Aim for one of these: hat, visor, sunglasses, headband, shirt, tank-top, long-sleeve, base-layer, mid-layer, jacket, vest, windbreaker, rain-jacket, shorts, capris, tights, pants, gloves, mittens, socks, shoes, gaiter, balaclava, accessory."),
 });
 export type DressMyRunItem = z.infer<typeof DressMyRunItemSchema>;
-export type DressMyRunItemCategory = DressMyRunItem['category']; // For use in UI if needed
 
 
 const CustomizeNewsletterOutputSchema = z.object({
@@ -85,7 +84,7 @@ const CustomizeNewsletterOutputSchema = z.object({
       z.object({
         title: z.string().describe('The title of the summarized article.'),
         summary: z.string().describe('A concise summary of the article snippet from the search result. If the original snippet is short, the summary might be very similar to it.'),
-        url: z.string().url().describe('The URL of the article.'),
+        url: z.string().url().describe('The URL of the article from the search tool.'),
         priority: z
           .number()
           .int()
@@ -110,14 +109,14 @@ const prompt = ai.definePrompt({
   input: {schema: CustomizeNewsletterInputSchema},
   output: {schema: CustomizeNewsletterOutputSchema},
   tools: [
-    workoutPunGreetingTool, // Use the imported TOOL
+    workoutPunGreetingTool, 
     fetchGoogleRunningNewsTool
   ],
   prompt: `You are a personalized newsletter generator for runners for Shut Up and Run. You will generate a newsletter based on the user's preferences, training plan, and daily weather forecast.
 
   Your response MUST be in JSON format, adhering to the defined output schema.
-  The 'topStories' field must contain exactly 5 articles if news is found, otherwise an empty array.
-  If the 'fetchGoogleRunningNewsTool' returns an error or no articles, then the 'topStories' field in your JSON output MUST be an empty array ([]). Do not invent news stories.
+  The 'topStories' field must contain up to 5 articles if news is found, otherwise an empty array.
+  CRITICAL: If the 'fetchGoogleRunningNewsTool' returns an error, or if its 'articles' array is empty or null, then the 'topStories' field in your JSON output MUST be an empty array ([]). Do NOT invent news stories, titles, summaries, or URLs. Only use data provided by the tool for the news stories.
 
   Tasks to perform:
   1. Generate a personalized greeting: Use the 'workoutPunGreetingTool'. The tool expects an input object like '{ "userName": "string" }'. The user's name is {{{userName}}}. The tool will return an object like '{ "greeting": "string" }'. Use the value of the returned 'greeting' field for the 'greeting' field in your final JSON output. Ensure this greeting is fun and motivational, with a running-related pun.
@@ -137,11 +136,12 @@ const prompt = ai.definePrompt({
 
   4. Fetch, summarize, and prioritize news: Use the 'fetchGoogleRunningNewsTool' to get running news stories.
      - Pass the user's 'newsSearchPreferences' ({{{newsSearchPreferences}}}) and 'location' ({{{location}}}) to the tool.
-     - The tool will return a list of articles with titles, links, and snippets, or an error if fetching failed.
-     - From the articles returned by the tool, select up to 5 of the most relevant and interesting stories for the user.
-     - For each selected story, provide a concise summary based on its snippet.
+     - The tool will return an object, e.g., '{ "articles": [{ "title": "...", "link": "...", "snippet": "..." }, ...], "error": "optional_error_message" }'.
+     - From the 'articles' array returned by the tool, select up to 5 of the most relevant and interesting stories for the user.
+     - When selecting stories, aim for topic diversity; avoid multiple stories about the exact same event or product unless they offer distinct perspectives.
+     - For each selected story, provide a concise summary based on its snippet. The URL for each story must be the 'link' provided by the tool and must be a valid-looking web URL.
      - Assign a priority (1=highest) to each selected story.
-     - CRITICAL: If the 'fetchGoogleRunningNewsTool' returns an error or its 'articles' array is empty, the 'topStories' field in your JSON output MUST be an empty array ([]). Do NOT generate placeholder or fake news.
+     - VERY IMPORTANT: If the tool's result contains an 'error' field, or if the 'articles' array is empty or missing, your 'topStories' output MUST be an empty array ([]). Do not create news.
 
   5. Plan end notification: If the user's training plan has ended (indicated by the workout text), include a 'planEndNotification' message. Omit if no plan end is indicated.
 
@@ -181,7 +181,6 @@ const customizeNewsletterFlow = ai.defineFlow(
       
       let fallbackGreeting = `Hello ${input.userName}, your personalized newsletter could not be generated by the AI at this time.`;
       try {
-        // Try calling the tool directly as a fallback for greeting
         const greetingResult = await workoutPunGreetingTool({ userName: input.userName });
         if (greetingResult && greetingResult.greeting) {
           fallbackGreeting = greetingResult.greeting;
@@ -205,48 +204,50 @@ const customizeNewsletterFlow = ai.defineFlow(
         greeting: fallbackGreeting,
         weather: fallbackWeather,
         workout: fallbackWorkout,
-        topStories: [],
+        topStories: [], // CRITICAL: Default to empty array if AI fails
         planEndNotification: undefined,
-        dressMyRunSuggestion: [],
+        dressMyRunSuggestion: [], // CRITICAL: Default to empty array
       };
       console.log("[customizeNewsletterFlow] Returning fallback due to no AI output:", fallbackResult);
       return fallbackResult;
     }
-    console.log("[customizeNewsletterFlow] AI prompt produced output:", JSON.stringify(output, null, 2));
-
+    console.log("[customizeNewsletterFlow] AI prompt produced output (raw):", JSON.stringify(output, null, 2));
 
     // Safeguard for topStories
-    if (!Array.isArray(output.topStories)) {
+    if (!output.topStories || !Array.isArray(output.topStories)) {
         console.warn("[customizeNewsletterFlow] AI output for topStories was not an array or was missing. Defaulting to empty array. Received:", output.topStories);
         output.topStories = [];
     } else {
-        output.topStories = output.topStories.filter(story =>
-            typeof story === 'object' && story !== null &&
-            typeof story.title === 'string' &&
-            typeof story.summary === 'string' &&
-            typeof story.url === 'string' &&
-            (() => {
-                if (story.url && !/^https?:\/\//i.test(story.url)) {
-                  const storyIndex = output.topStories.findIndex(s => s === story);
-                  if (storyIndex !== -1) {
-                    output.topStories[storyIndex].url = "http://" + story.url;
-                  }
-                }
-                return true;
-            })() &&
-            typeof story.priority === 'number'
-        ).slice(0, 5);
+        output.topStories = output.topStories.filter(story => {
+            if (typeof story !== 'object' || story === null) return false;
+            const hasValidFields = 
+                typeof story.title === 'string' && story.title.trim() !== '' &&
+                typeof story.summary === 'string' &&
+                typeof story.url === 'string' &&
+                typeof story.priority === 'number';
+            
+            if (!hasValidFields) {
+                console.warn("[customizeNewsletterFlow] Filtering out story with missing/invalid fields:", story);
+                return false;
+            }
+
+            if (!/^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(story.url)) {
+                console.warn(`[customizeNewsletterFlow] Filtering out story with invalid URL: "${story.url}" Title: "${story.title}"`);
+                return false;
+            }
+            return true;
+        }).slice(0, 5); // Ensure max 5 stories
     }
     
     // Safeguard for dressMyRunSuggestion
-    if (!Array.isArray(output.dressMyRunSuggestion)) {
-        console.warn("[customizeNewsletterFlow] AI output for dressMyRunSuggestion was not an array. Received:", output.dressMyRunSuggestion, "Defaulting to empty array.");
+    if (!output.dressMyRunSuggestion || !Array.isArray(output.dressMyRunSuggestion)) {
+        console.warn("[customizeNewsletterFlow] AI output for dressMyRunSuggestion was not an array or missing. Received:", output.dressMyRunSuggestion, "Defaulting to empty array.");
         output.dressMyRunSuggestion = [];
     } else {
         output.dressMyRunSuggestion = output.dressMyRunSuggestion.filter(item =>
             typeof item === 'object' && item !== null &&
-            'item'in item && typeof item.item === 'string' &&
-            'category' in item && typeof item.category === 'string'
+            'item'in item && typeof item.item === 'string' && item.item.trim() !== '' &&
+            'category' in item && typeof item.category === 'string' && item.category.trim() !== ''
         );
     }
     
@@ -257,19 +258,27 @@ const customizeNewsletterFlow = ai.defineFlow(
         output.dressMyRunSuggestion = [];
     }
 
-    // Check results from the actual tool call to prevent fake news
-    try {
-      const newsToolResults = await fetchGoogleRunningNewsTool({ userLocation: input.location, searchCategories: input.newsSearchPreferences });
-      if ((newsToolResults.error || !newsToolResults.articles || newsToolResults.articles.length === 0) && output.topStories.length > 0) {
-        console.warn("[customizeNewsletterFlow] News tool returned no articles or an error, but AI generated topStories. Overriding topStories to empty array.");
-        output.topStories = [];
-      }
-    } catch (toolError) {
-        console.warn("[customizeNewsletterFlow] Error calling fetchGoogleRunningNewsTool during safeguard check. Overriding topStories to empty array.", toolError);
-        output.topStories = [];
+    // Strongest safeguard: Re-check actual tool results if AI produced stories.
+    // This prevents hallucination if the AI ignores prompt instructions about empty tool results.
+    if (output.topStories.length > 0) {
+        try {
+            console.log("[customizeNewsletterFlow] Verifying news tool results for AI-generated stories...");
+            const newsToolResults = await fetchGoogleRunningNewsTool({ userLocation: input.location, searchCategories: input.newsSearchPreferences });
+            if (newsToolResults.error || !newsToolResults.articles || newsToolResults.articles.length === 0) {
+                console.warn("[customizeNewsletterFlow] VERIFICATION FAILED: News tool actually returned no articles or an error, but AI generated topStories. Overriding topStories to empty array. Tool Result:", newsToolResults);
+                output.topStories = [];
+            } else {
+                console.log("[customizeNewsletterFlow] VERIFICATION PASSED: News tool returned articles, AI stories plausible.", newsToolResults.articles.length);
+            }
+        } catch (toolError) {
+            console.warn("[customizeNewsletterFlow] VERIFICATION ERROR: Error calling fetchGoogleRunningNewsTool during safeguard check. Overriding topStories to empty array.", toolError);
+            output.topStories = [];
+        }
     }
     
     console.log("[customizeNewsletterFlow] Returning processed output:", JSON.stringify(output, null, 2));
     return output;
   }
 );
+
+    

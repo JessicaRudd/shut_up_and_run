@@ -9,7 +9,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import axios from 'axios';
 import type { NewsSearchCategory } from '@/lib/types';
 
@@ -37,7 +37,7 @@ export type FetchGoogleRunningNewsOutput = z.infer<typeof FetchGoogleRunningNews
 const fetchGoogleRunningNewsTool = ai.defineTool(
   {
     name: 'fetchGoogleRunningNewsTool',
-    description: 'Fetches top running-related news articles from Google Search based on user preferences (categories, location). Returns a list of articles with titles, links, and snippets.',
+    description: 'Fetches top running-related news articles from Google Search based on user preferences (categories, location) within the last 7 days. Returns a list of articles with titles, links, and snippets.',
     inputSchema: FetchGoogleRunningNewsInputSchema,
     outputSchema: FetchGoogleRunningNewsOutputSchema,
   },
@@ -46,7 +46,7 @@ const fetchGoogleRunningNewsTool = ai.defineTool(
     const cx = process.env.GOOGLE_SEARCH_CX;
 
     if (!apiKey || !cx) {
-      console.error("Google Search API key or CX is not configured in .env file.");
+      console.error("[fetchGoogleRunningNewsTool] Google Search API key or CX is not configured in .env file.");
       return { articles: [], error: "News service (Google Search) is not configured. API key or CX missing." };
     }
 
@@ -80,61 +80,59 @@ const fetchGoogleRunningNewsTool = ai.defineTool(
             searchKeywords.push("running training tips OR marathon training OR 5k training OR running workouts");
             break;
           default:
-            // For any other category string, just add it as a keyword
             searchKeywords.push(category); 
         }
       });
     }
     
- if (searchKeywords.length > 0) {
- query += ` ${searchKeywords.join(" OR ")}`; // Combine specific keywords if any
- }
+    if (searchKeywords.length > 0) {
+      query += ` ${searchKeywords.join(" OR ")}`;
+    }
 
-// Limit results to recent news, e.g., last 7 days.
-// Google Custom Search API uses `dateRestrict` with `d[number]` for days, `w[number]` for weeks.
-// Let's aim for news within the last week.
-const dateRestrict = "w1";
+    const dateRestrict = "w1"; // Last 7 days
 
-// Google Custom Search API's dateRestrict is approximate and 'm3' is the closest option for filtering within the last 3 months. It cannot filter for an exact 3-month period.
- try {
-  console.log(`[fetchGoogleRunningNewsTool] Performing Google Search with query: "${query}", dateRestrict: "${dateRestrict}"`);
-  const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
-    params: {
-      key: apiKey,
-      cx: cx,
-      q: query,
-      num: 10, // Request 10 results, AI will pick top 5 later
-      // sort: 'date', // Sorting by date can be useful
-      dateRestrict: dateRestrict, 
-    },
-    headers: { 'User-Agent': 'ShutUpAndRunApp/1.0 (GenkitTool)' },
-  });
+    try {
+      console.log(`[fetchGoogleRunningNewsTool] Performing Google Search with query: "${query}", dateRestrict: "${dateRestrict}"`);
+      const response = await axios.get('https://www.googleapis.com/customsearch/v1', {
+        params: {
+          key: apiKey,
+          cx: cx,
+          q: query,
+          num: 10, 
+          dateRestrict: dateRestrict, 
+        },
+        headers: { 'User-Agent': 'ShutUpAndRunApp/1.0 (GenkitTool)' },
+      });
 
-  if (response.data && response.data.items) {
-    const articles: NewsArticle[] = response.data.items.map((item: any) => ({
-      title: item.title,
-      link: item.link,
-      snippet: item.snippet,
-    })).filter((article: NewsArticle) => article.link && article.title && article.snippet); // Basic validation
-    
-    console.log(`[fetchGoogleRunningNewsTool] Found ${articles.length} articles from Google Search.`);
-    return { articles };
-  } else {
-    console.log('[fetchGoogleRunningNewsTool] No items found in Google Search response.');
-    return { articles: [], error: "No relevant news found for the selected preferences." };
+      if (response.data && response.data.items) {
+        console.log(`[fetchGoogleRunningNewsTool] Google Search API returned ${response.data.items.length} raw items.`);
+        const articles: NewsArticle[] = response.data.items.map((item: any) => ({
+          title: item.title,
+          link: item.link,
+          snippet: item.snippet,
+        })).filter((article: NewsArticle) => 
+          article.link && 
+          article.title && 
+          article.snippet && 
+          /^https?:\/\//i.test(article.link) // Ensure link starts with http/https
+        );
+        
+        console.log(`[fetchGoogleRunningNewsTool] Found ${articles.length} valid articles after filtering.`);
+        return { articles };
+      } else {
+        console.log('[fetchGoogleRunningNewsTool] No items found in Google Search response.');
+        return { articles: [], error: "No relevant news found for the selected preferences from Google Search." };
+      }
+    } catch (error: any) {
+      console.error('[fetchGoogleRunningNewsTool] Error calling Google Search API:', error.response?.data?.error?.message || error.message);
+      let errorMessage = "Failed to fetch news from Google Search.";
+      if (error.response?.data?.error?.message) {
+        errorMessage += ` Details: ${error.response.data.error.message}`;
+      }
+      return { articles: [], error: errorMessage };
+    }
   }
-} catch (error: any) {
-  console.error('[fetchGoogleRunningNewsTool] Error calling Google Search API:', error.response?.data?.error?.message || error.message);
-  let errorMessage = "Failed to fetch news from Google Search.";
-  if (error.response?.data?.error?.message) {
-    errorMessage += ` Details: ${error.response.data.error.message}`;
-  }
-  return { articles: [], error: errorMessage };
-}
-}
 );
 
-// Export a wrapper function if you intend to call this tool directly from other server code,
-// though typically tools are invoked by the LLM within a flow.
-// For now, this tool will be used by the `customizeNewsletterPrompt`.
-export { fetchGoogleRunningNewsTool }; // Export the tool itself for use in flows
+export { fetchGoogleRunningNewsTool };
+    
