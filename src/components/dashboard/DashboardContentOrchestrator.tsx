@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
@@ -17,7 +16,7 @@ import { AlertTriangle } from "lucide-react";
 import { TRAINING_PLANS } from "@/lib/constants";
 import { format } from "date-fns";
 import { useUserProfile } from "@/contexts/UserProfileContext";
-// Removed: import { fetchGoogleRunningNewsTool } from "@/ai/tools/fetch-google-running-news-tool"; // Not used directly here
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 interface CachedNewsletterData {
   data: CustomizeNewsletterOutput;
@@ -75,21 +74,33 @@ export function DashboardContentOrchestrator() {
       console.log("[Orchestrator] Today's workout:", todaysWorkout);
       
       const weatherApiUnit = userProfile.weatherUnit === "C" ? "metric" : "imperial";
-      const weatherResult = await getWeatherByLocation(userProfile.location, weatherApiUnit);
+      
+      // Initialize Firebase Functions
+      const functions = getFunctions();
+      const getWeatherData = httpsCallable<{ location: string; unit: string }, DailyForecastData | { error: string }>(functions, 'weather-getData');
+
+      // Call the Cloud Function
+      const weatherResult = await getWeatherData({ 
+        location: userProfile.location, 
+        unit: weatherApiUnit 
+      });
+      
       console.log("[Orchestrator] Weather service result:", weatherResult);
 
       let weatherInputForAI: CustomizeNewsletterInput['weather'];
 
-      if ('error' in weatherResult) {
-        console.warn("[Orchestrator] Weather service returned an error:", weatherResult.error);
-        weatherInputForAI = { error: weatherResult.error };
-        setWeatherErrorForAI(weatherResult.error); 
+      if ('error' in weatherResult.data) {
+        const errorMessage = weatherResult.data.error || 'Unknown error fetching weather data';
+        console.warn("[Orchestrator] Weather service returned an error:", errorMessage);
+        weatherInputForAI = { error: errorMessage };
+        setWeatherErrorForAI(errorMessage); 
       } else {
-        weatherInputForAI = weatherResult as DailyForecastData;
-        if (weatherResult.error) { // Check for internal error in successfully fetched data
-          console.warn("[Orchestrator] Weather data processed with an internal error message:", weatherResult.error);
-          weatherInputForAI = { ...weatherResult, error: weatherResult.error }; // Pass along the error
-          setWeatherErrorForAI(weatherResult.error);
+        weatherInputForAI = weatherResult.data;
+        if (weatherResult.data.error) {
+          const errorMessage = weatherResult.data.error || 'Unknown error in weather data';
+          console.warn("[Orchestrator] Weather data processed with an internal error message:", errorMessage);
+          weatherInputForAI = { ...weatherResult.data, error: errorMessage };
+          setWeatherErrorForAI(errorMessage);
         }
       }
       

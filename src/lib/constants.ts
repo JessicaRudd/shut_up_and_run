@@ -1,5 +1,12 @@
-
-import type { NewsSearchCategory, LongRunDay } from "./types";
+import type { 
+  NewsSearchCategory, 
+  LongRunDay, 
+  UserProfile, 
+  RunningLevel, 
+  TrainingPlan, 
+  WeatherUnit, 
+  NewsletterDelivery 
+} from "./types";
 
 export const RUNNING_LEVELS = [
   { value: "beginner", label: "Beginner" },
@@ -50,19 +57,19 @@ export const LONG_RUN_DAY_OPTIONS: { value: LongRunDay; label: string }[] = [
   // { value: "friday", label: "Friday" },
 ];
 
-export const DEFAULT_USER_PROFILE = {
+export const DEFAULT_USER_PROFILE: UserProfile = {
   id: '',
   name: '',
   location: '',
-  runningLevel: "beginner" as const, 
-  trainingPlan: "5k" as const, 
+  runningLevel: "beginner" as RunningLevel,
+  trainingPlan: "5k" as TrainingPlan,
   planStartDate: undefined,
   raceDate: undefined,
-  weatherUnit: "F" as const,
-  newsletterDelivery: "email" as const,
+  weatherUnit: "F" as WeatherUnit,
+  newsletterDelivery: "email" as NewsletterDelivery,
   newsSearchPreferences: [] as NewsSearchCategory[],
-  runningDaysPerWeek: 5 as number, // Default to 5 days
-  longRunDay: "saturday" as LongRunDay, // Default to Saturday
+  runningDaysPerWeek: 5,
+  longRunDay: "saturday" as LongRunDay,
 };
 
 // For AI flow, structure for news article input (from Google Search tool)

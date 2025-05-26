@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A Genkit tool to fetch running news using Google Custom Search API.
