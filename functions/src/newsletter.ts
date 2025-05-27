@@ -9,10 +9,8 @@ interface NewsletterDelivery {
   googleChat?: string;
 }
 
-export const generateAndDeliverNewsletter = functions.pubsub
-  .schedule('0 0 * * *') // Run at midnight every day
-  .timeZone('America/New_York') // Adjust based on your target timezone
-  .onRun(async (context: functions.EventContext) => {
+export const generateAndDeliverNewsletter = functions.scheduler
+  .onSchedule('0 0 * * *', async (event) => {
     try {
       // Get all users
       const usersSnapshot = await db.collection('users').get();
@@ -89,8 +87,6 @@ export const generateAndDeliverNewsletter = functions.pubsub
           continue;
         }
       }
-
-      return null;
     } catch (error) {
       console.error('Error in newsletter generation:', error);
       throw error;

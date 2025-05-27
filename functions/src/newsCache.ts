@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions';
 import { db } from './lib/firebase/admin';
 import axios from 'axios';
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+import type { NewsArticle } from './types';
 
 const secretManager = new SecretManagerServiceClient();
 
@@ -10,12 +11,6 @@ async function getSecret(secretName: string): Promise<string> {
     name: `projects/shut-up-and-run/secrets/${secretName}/versions/latest`,
   });
   return version.payload?.data?.toString() || '';
-}
-
-interface NewsArticle {
-  title: string;
-  link: string;
-  snippet: string;
 }
 
 interface NewsCacheData {
@@ -63,13 +58,18 @@ export async function fetchNewsData(categories: string[], location?: string): Pr
   return articles;
 }
 
-export const getNewsData = functions.https.onCall(async (data: { categories: string[]; location?: string }, context: functions.https.CallableContext) => {
-  if (!context.auth) {
+export const getNewsData = functions.https.onCall(async (request) => {
+  const { categories, location } = request.data as { categories: string[]; location?: string };
+  const context = request.auth;
+
+  if (!context) {
     throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
   }
-  const { categories, location } = data;
-  if (!categories || !Array.isArray(categories)) {
-    throw new functions.https.HttpsError('invalid-argument', 'Categories array is required');
+
+  try {
+    return await fetchNewsData(categories, location);
+  } catch (error) {
+    console.error('Error fetching news data:', error);
+    throw new functions.https.HttpsError('internal', 'Failed to fetch news data');
   }
-  return fetchNewsData(categories, location);
 }); 

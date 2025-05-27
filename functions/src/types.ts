@@ -31,6 +31,7 @@ export interface WeatherData {
   sunrise: string;
   sunset: string;
   humidityAvg: number;
+  windAvg: number;
   hourly: Array<{
     time: string;
     temp: number;

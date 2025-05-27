@@ -88,14 +88,18 @@ async function fetchNewsData(categories, location) {
     });
     return articles;
 }
-exports.getNewsData = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
+exports.getNewsData = functions.https.onCall(async (request) => {
+    const { categories, location } = request.data;
+    const context = request.auth;
+    if (!context) {
         throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
     }
-    const { categories, location } = data;
-    if (!categories || !Array.isArray(categories)) {
-        throw new functions.https.HttpsError('invalid-argument', 'Categories array is required');
+    try {
+        return await fetchNewsData(categories, location);
     }
-    return fetchNewsData(categories, location);
+    catch (error) {
+        console.error('Error fetching news data:', error);
+        throw new functions.https.HttpsError('internal', 'Failed to fetch news data');
+    }
 });
 //# sourceMappingURL=newsCache.js.map

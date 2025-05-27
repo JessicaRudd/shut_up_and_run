@@ -38,10 +38,8 @@ const functions = __importStar(require("firebase-functions"));
 const admin_1 = require("./lib/firebase/admin");
 const weatherCache_1 = require("./weatherCache");
 const newsCache_1 = require("./newsCache");
-exports.generateAndDeliverNewsletter = functions.pubsub
-    .schedule('0 0 * * *') // Run at midnight every day
-    .timeZone('America/New_York') // Adjust based on your target timezone
-    .onRun(async (context) => {
+exports.generateAndDeliverNewsletter = functions.scheduler
+    .onSchedule('0 0 * * *', async (event) => {
     var _a, _b, _c;
     try {
         // Get all users
@@ -109,7 +107,6 @@ exports.generateAndDeliverNewsletter = functions.pubsub
                 continue;
             }
         }
-        return null;
     }
     catch (error) {
         console.error('Error in newsletter generation:', error);

@@ -117,20 +117,51 @@ async function fetchWeatherData(location, unit = 'imperial') {
         throw new functions.https.HttpsError('internal', `Failed to fetch weather data: ${error.message}`);
     }
 }
-exports.getWeatherData = functions.https.onCall(async (data, context) => {
-    if (!context.auth) {
-        throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+exports.getWeatherData = functions.https.onRequest(async (req, res) => {
+    // Set CORS headers
+    const allowedOrigins = [
+        'https://shut-up-and-run.web.app',
+        'https://shut-up-and-run.firebaseapp.com',
+        'http://localhost:3000'
+    ];
+    const origin = req.headers.origin;
+    if (origin && allowedOrigins.includes(origin)) {
+        res.set('Access-Control-Allow-Origin', origin);
     }
-    const { location, unit = 'imperial' } = data;
-    if (!location) {
-        throw new functions.https.HttpsError('invalid-argument', 'Location is required');
+    else {
+        res.set('Access-Control-Allow-Origin', allowedOrigins[0]);
+    }
+    res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Max-Age', '3600');
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+        res.status(204).send('');
+        return;
     }
     try {
-        return await fetchWeatherData(location, unit);
+        // Get auth token from Authorization header
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            res.status(401).json({ error: 'Unauthorized' });
+            return;
+        }
+        // Optionally verify token here if needed
+        // const token = authHeader.split('Bearer ')[1];
+        // ...
+        // Get location and unit from query or body
+        const location = req.query.location || req.body.location;
+        const unit = req.query.unit || req.body.unit || 'imperial';
+        if (!location) {
+            res.status(400).json({ error: 'Location is required' });
+            return;
+        }
+        const weatherData = await fetchWeatherData(location, unit);
+        res.status(200).json(weatherData);
     }
     catch (error) {
-        console.error(`[WeatherCache] Error in getWeatherData for ${location}:`, error);
-        throw new functions.https.HttpsError('internal', `Failed to get weather data: ${error.message}`);
+        console.error('Error fetching weather data:', error);
+        res.status(500).json({ error: error.message || 'Failed to fetch weather data' });
     }
 });
 //# sourceMappingURL=weatherCache.js.map

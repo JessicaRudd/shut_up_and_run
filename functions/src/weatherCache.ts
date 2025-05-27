@@ -2,7 +2,7 @@ import * as functions from 'firebase-functions';
 import { db } from './lib/firebase/admin';
 import axios from 'axios';
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
-import * as admin from 'firebase-admin';
+import type { WeatherData } from './types';
 
 const secretManager = new SecretManagerServiceClient();
 
@@ -11,28 +11,6 @@ async function getSecret(secretName: string): Promise<string> {
     name: `projects/shut-up-and-run/secrets/${secretName}/versions/latest`,
   });
   return version.payload?.data?.toString() || '';
-}
-
-interface WeatherData {
-  locationName: string;
-  date: string;
-  overallDescription: string;
-  tempMin: number;
-  tempMax: number;
-  sunrise: string;
-  sunset: string;
-  humidityAvg: number;
-  windAvg: number;
-  hourly: Array<{
-    time: string;
-    temp: number;
-    feelsLike: number;
-    description: string;
-    pop: number;
-    windSpeed: number;
-    windGust?: number;
-    icon: string;
-  }>;
 }
 
 interface WeatherCacheData {
@@ -119,9 +97,20 @@ export async function fetchWeatherData(location: string, unit = 'imperial'): Pro
 
 export const getWeatherData = functions.https.onRequest(async (req, res) => {
   // Set CORS headers
-  res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, POST');
+  const allowedOrigins = [
+    'https://shut-up-and-run.web.app',
+    'https://shut-up-and-run.firebaseapp.com',
+    'http://localhost:3000'
+  ];
+  const origin = req.headers.origin;
+  if (origin && allowedOrigins.includes(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+  } else {
+    res.set('Access-Control-Allow-Origin', allowedOrigins[0]);
+  }
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.set('Access-Control-Max-Age', '3600');
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
@@ -136,20 +125,21 @@ export const getWeatherData = functions.https.onRequest(async (req, res) => {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
+    // Optionally verify token here if needed
+    // const token = authHeader.split('Bearer ')[1];
+    // ...
 
-    const token = authHeader.split('Bearer ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    
-    const { location, unit = 'imperial' } = req.query;
+    // Get location and unit from query or body
+    const location = req.query.location || req.body.location;
+    const unit = req.query.unit || req.body.unit || 'imperial';
     if (!location) {
       res.status(400).json({ error: 'Location is required' });
       return;
     }
-
     const weatherData = await fetchWeatherData(location as string, unit as string);
     res.status(200).json(weatherData);
   } catch (error: any) {
-    console.error(`[WeatherCache] Error in getWeatherData:`, error);
-    res.status(500).json({ error: `Failed to get weather data: ${error.message}` });
+    console.error('Error fetching weather data:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch weather data' });
   }
 }); 
