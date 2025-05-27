@@ -8,6 +8,14 @@
     ],
     "frameworksBackend": {
       "region": "us-central1"
+    },
+    "environment": {
+      "NEXT_PUBLIC_FIREBASE_API_KEY": "AIzaSyDNBP-bkrosDIUm7BmGhtxoEbG-Q5XUezk",
+      "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN": "shut-up-and-run.firebaseapp.com",
+      "NEXT_PUBLIC_FIREBASE_PROJECT_ID": "shut-up-and-run",
+      "NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET": "shut-up-and-run.appspot.com",
+      "NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "1013387810356",
+      "NEXT_PUBLIC_FIREBASE_APP_ID": "1:1013387810356:web:1cf22c2769347c964fdc61"
     }
   },
   "firestore": {

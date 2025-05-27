@@ -119,16 +119,6 @@ export const getWeatherData = functions.https.onRequest(async (req, res) => {
   }
 
   try {
-    // Get auth token from Authorization header
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
-    // Optionally verify token here if needed
-    // const token = authHeader.split('Bearer ')[1];
-    // ...
-
     // Get location and unit from query or body
     const location = req.query.location || req.body.location;
     const unit = req.query.unit || req.body.unit || 'imperial';
