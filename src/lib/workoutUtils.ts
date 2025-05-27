@@ -1,6 +1,5 @@
-
 import type { UserProfile, DatedWorkout, TrainingPlan, LongRunDay } from "@/lib/types";
-import { TRAINING_PLANS } from "@/lib/constants";
+import { TRAINING_PLANS, DEFAULT_USER_PROFILE } from "@/lib/constants";
 import { addDays, differenceInCalendarDays, startOfDay, getDay, formatISO } from "date-fns";
 
 type WorkoutType = "LongRun" | "Interval" | "Tempo" | "EasyRun" | "Rest" | "RaceDay";

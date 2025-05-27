@@ -1,8 +1,7 @@
-
-export type RunningLevel = "beginner" | "intermediate" | "advanced" | "";
-export type TrainingPlan = "5k" | "10k" | "half-marathon" | "marathon" | "ultra" | "";
-export type WeatherUnit = "C" | "F" | "";
-export type NewsletterDelivery = "email" | "hangouts" | "";
+export type RunningLevel = "beginner" | "intermediate" | "advanced";
+export type TrainingPlan = "5k" | "10k" | "half-marathon" | "marathon" | "ultra";
+export type WeatherUnit = "C" | "F";
+export type NewsletterDelivery = "email" | "hangouts";
 
 export type NewsSearchCategory = 
   | "geographic_area" 

@@ -58,6 +58,11 @@ export function DashboardContentOrchestrator() {
 
   const fetchNewsletterDataAndUpdateState = useCallback(async (currentDateStr: string, currentProfileSnapshotForCache: CachedNewsletterData['profileSnapshot']) => {
     if (!userProfile.name || !userProfile.location || !userProfile.weatherUnit) {
+      console.log("[Orchestrator] Missing required profile data:", { 
+        name: !!userProfile.name, 
+        location: !!userProfile.location, 
+        weatherUnit: !!userProfile.weatherUnit 
+      });
       setError("Please complete your profile including name, location, and weather unit to load the dashboard.");
       setNewsletterData(null);
       setOrchestratorLoading(false);
@@ -75,33 +80,19 @@ export function DashboardContentOrchestrator() {
       
       const weatherApiUnit = userProfile.weatherUnit === "C" ? "metric" : "imperial";
       
-      // Initialize Firebase Functions
-      const functions = getFunctions();
-      const getWeatherData = httpsCallable<{ location: string; unit: string }, DailyForecastData | { error: string }>(functions, 'weather-getData');
-
-      // Call the Cloud Function
-      const weatherResult = await getWeatherData({ 
-        location: userProfile.location, 
-        unit: weatherApiUnit 
-      });
-      
-      console.log("[Orchestrator] Weather service result:", weatherResult);
+      // Get weather data using the updated service
+      const weatherData = await getWeatherByLocation(userProfile.location, weatherApiUnit);
+      console.log("[Orchestrator] Weather service result:", weatherData);
 
       let weatherInputForAI: CustomizeNewsletterInput['weather'];
 
-      if ('error' in weatherResult.data) {
-        const errorMessage = weatherResult.data.error || 'Unknown error fetching weather data';
+      if ('error' in weatherData) {
+        const errorMessage = typeof weatherData.error === 'string' ? weatherData.error : 'Unknown error fetching weather data';
         console.warn("[Orchestrator] Weather service returned an error:", errorMessage);
         weatherInputForAI = { error: errorMessage };
         setWeatherErrorForAI(errorMessage); 
       } else {
-        weatherInputForAI = weatherResult.data;
-        if (weatherResult.data.error) {
-          const errorMessage = weatherResult.data.error || 'Unknown error in weather data';
-          console.warn("[Orchestrator] Weather data processed with an internal error message:", errorMessage);
-          weatherInputForAI = { ...weatherResult.data, error: errorMessage };
-          setWeatherErrorForAI(errorMessage);
-        }
+        weatherInputForAI = weatherData;
       }
       
       let derivedRaceDistance = "General Fitness";
@@ -139,34 +130,12 @@ export function DashboardContentOrchestrator() {
       console.log("[Orchestrator] Newsletter data cached successfully with snapshot:", currentProfileSnapshotForCache);
 
       setNewsletterData(result);
-    } catch (err: any) {
-      console.error("[Orchestrator] Error fetching personalized newsletter data:", err);
-      let errorMessage = "Could not load your personalized dashboard. ";
-      if (err.message) {
-        errorMessage += err.message;
-      } else if (typeof err === 'string') {
-        errorMessage += err;
-      } else {
-        errorMessage += "An unknown error occurred processing your dashboard content."
-      }
-      const isAIFlowError = err.message?.toLowerCase().includes('ai') || 
-                            err.message?.toLowerCase().includes('flow') || 
-                            err.message?.toLowerCase().includes('tool') ||
-                            err.message?.toLowerCase().includes('genkit');
-
-      if (weatherErrorForAI && isAIFlowError) {
-          setError(`Failed to process data due to an AI or tool error. This might be related to weather data or news search. Weather service message: ${weatherErrorForAI}. AI error: ${err.message}. Full details: ${errorMessage}`);
-      } else if (isAIFlowError) {
-          setError(`An error occurred with the AI content generation service: ${err.message}. Full details: ${errorMessage}`);
-      } else {
-          setError(errorMessage);
-      }
-      setNewsletterData(null);
-    } finally {
-      console.log("[Orchestrator] Finished fetching newsletter data. Setting orchestrator loading to false.");
+    } catch (error: any) {
+      console.error("[Orchestrator] Error fetching newsletter data:", error);
+      setError(error.message || "Failed to fetch newsletter data");
       setOrchestratorLoading(false);
     }
-  }, [userProfile]); // userProfile is the main dependency for re-fetching
+  }, [userProfile, setWeatherErrorForAI, setOrchestratorLoading, setError, setNewsletterData]);
 
   useEffect(() => {
     if (userProfileLoading) {

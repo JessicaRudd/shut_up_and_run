@@ -1,16 +1,24 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.newsletter = exports.news = exports.weather = void 0;
-const weatherCache_1 = require("./weatherCache");
-const newsCache_1 = require("./newsCache");
-const newsletter_1 = require("./newsletter");
-exports.weather = {
-    getData: weatherCache_1.getWeatherData
-};
-exports.news = {
-    getData: newsCache_1.getNewsData
-};
-exports.newsletter = {
-    generateAndDeliver: newsletter_1.generateAndDeliverNewsletter
-};
+const processConfig_1 = require("./lib/processConfig");
+// Configure process settings
+(0, processConfig_1.configureProcess)();
+// Export all functions
+__exportStar(require("./weatherCache"), exports);
+__exportStar(require("./newsCache"), exports);
+__exportStar(require("./newsletter"), exports);
 //# sourceMappingURL=index.js.map

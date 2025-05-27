@@ -3,18 +3,30 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  apiKey: "AIzaSyDNBP-bkrosDIUm7BmGhtxoEbG-Q5XUezk", // Replace with your actual API key
+  authDomain: "shut-up-and-run.firebaseapp.com",
+  projectId: "shut-up-and-run",
+  storageBucket: "shut-up-and-run.appspot.com",
+  messagingSenderId: "1013387810356", // Replace with your actual sender ID
+  appId: "1:1013387810356:web:1cf22c2769347c964fdc61" // Replace with your actual app ID
 };
+
+// Debug log to verify config
+console.log('Firebase Config:', {
+  ...firebaseConfig,
+  apiKey: firebaseConfig.apiKey ? '***' : undefined // Hide the actual API key in logs
+});
 
 // Initialize Firebase
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// Debug log to verify initialization
+console.log('Firebase initialized:', {
+  app: !!app,
+  auth: !!auth,
+  db: !!db
+});
 
 export { app, auth, db }; 

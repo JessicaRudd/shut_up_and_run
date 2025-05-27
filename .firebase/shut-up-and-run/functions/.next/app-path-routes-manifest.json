@@ -1,0 +1,11 @@
+{
+  "/api/weather/route": "/api/weather",
+  "/_not-found/page": "/_not-found",
+  "/favicon.ico/route": "/favicon.ico",
+  "/page": "/",
+  "/signup/page": "/signup",
+  "/training-plan/page": "/training-plan",
+  "/feedback/page": "/feedback",
+  "/login/page": "/login",
+  "/profile/page": "/profile"
+}

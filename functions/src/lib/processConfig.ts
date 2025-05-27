@@ -1,8 +1,3 @@
-import { EventEmitter } from 'events';
-
-// Increase the maximum number of listeners for the process
-process.setMaxListeners(20); // Increased from default 10
-
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);

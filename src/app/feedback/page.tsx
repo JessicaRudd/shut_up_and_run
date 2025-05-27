@@ -1,4 +1,3 @@
-
 "use client";
 
 import { FeedbackForm } from "@/components/forms/FeedbackForm";
@@ -24,3 +23,5 @@ export default function FeedbackPage() {
     </MainLayout>
   );
 }
+
+export const dynamic = "force-dynamic";

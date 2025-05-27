@@ -2,6 +2,7 @@ import * as functions from 'firebase-functions';
 import { db } from './lib/firebase/admin';
 import axios from 'axios';
 import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+import * as admin from 'firebase-admin';
 
 const secretManager = new SecretManagerServiceClient();
 
@@ -116,20 +117,39 @@ export async function fetchWeatherData(location: string, unit = 'imperial'): Pro
   }
 }
 
-export const getWeatherData = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
-  }
+export const getWeatherData = functions.https.onRequest(async (req, res) => {
+  // Set CORS headers
+  res.set('Access-Control-Allow-Origin', '*');
+  res.set('Access-Control-Allow-Methods', 'GET, POST');
+  res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-  const { location, unit = 'imperial' } = data;
-  if (!location) {
-    throw new functions.https.HttpsError('invalid-argument', 'Location is required');
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(204).send('');
+    return;
   }
 
   try {
-    return await fetchWeatherData(location, unit);
+    // Get auth token from Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    
+    const { location, unit = 'imperial' } = req.query;
+    if (!location) {
+      res.status(400).json({ error: 'Location is required' });
+      return;
+    }
+
+    const weatherData = await fetchWeatherData(location as string, unit as string);
+    res.status(200).json(weatherData);
   } catch (error: any) {
-    console.error(`[WeatherCache] Error in getWeatherData for ${location}:`, error);
-    throw new functions.https.HttpsError('internal', `Failed to get weather data: ${error.message}`);
+    console.error(`[WeatherCache] Error in getWeatherData:`, error);
+    res.status(500).json({ error: `Failed to get weather data: ${error.message}` });
   }
 }); 

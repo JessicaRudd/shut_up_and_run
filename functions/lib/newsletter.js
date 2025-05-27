@@ -42,7 +42,7 @@ exports.generateAndDeliverNewsletter = functions.pubsub
     .schedule('0 0 * * *') // Run at midnight every day
     .timeZone('America/New_York') // Adjust based on your target timezone
     .onRun(async (context) => {
-    var _a, _b;
+    var _a, _b, _c;
     try {
         // Get all users
         const usersSnapshot = await admin_1.db.collection('users').get();
@@ -62,23 +62,36 @@ exports.generateAndDeliverNewsletter = functions.pubsub
                 // Gather data
                 const weatherData = await (0, weatherCache_1.fetchWeatherData)(userProfile.location);
                 const newsData = await (0, newsCache_1.fetchNewsData)(userProfile.newsSearchPreferences || [], userProfile.location);
+                // Generate newsletter content
+                const newsletterContent = {
+                    greeting: `Hey ${userProfile.name}, let's get ready to tackle those trails! Remember, every run is a step in the right direction.`,
+                    weather: `Today in ${weatherData.locationName} (${weatherData.date}), expect ${weatherData.overallDescription}. The high will be ${weatherData.tempMax}${userProfile.weatherUnit || 'F'} and the low ${weatherData.tempMin}${userProfile.weatherUnit || 'F'}. Sunrise is at ${weatherData.sunrise}, sunset at ${weatherData.sunset}, with an average humidity of ${weatherData.humidityAvg}%.`,
+                    workout: ((_a = userProfile.trainingPlan) === null || _a === void 0 ? void 0 : _a.currentWorkout) || 'No workout scheduled for today.',
+                    topStories: newsData.map(article => ({
+                        title: article.title,
+                        summary: article.snippet,
+                        url: article.link,
+                        priority: 1 // Default priority
+                    })),
+                    planEndNotification: userProfile.raceDate && new Date(userProfile.raceDate) <= new Date()
+                        ? `Your ${userProfile.trainingPlanType} training plan has ended. Consider updating your profile with a new training goal!`
+                        : 'Your training plan is still active. Keep up the great work!',
+                    dressMyRunSuggestion: [] // TODO: Implement dress my run suggestions based on weather
+                };
                 // Store newsletter in Firestore
                 await admin_1.db.collection('newsletters').add({
                     userId,
-                    content: {
-                        weather: weatherData,
-                        news: newsData
-                    },
+                    content: newsletterContent,
                     generatedAt: new Date(),
                     delivered: false
                 });
                 // Deliver newsletter based on user preferences
                 const delivery = {};
-                if ((_a = userProfile.newsletterDelivery) === null || _a === void 0 ? void 0 : _a.email) {
+                if ((_b = userProfile.newsletterDelivery) === null || _b === void 0 ? void 0 : _b.email) {
                     // TODO: Implement email delivery using SendGrid or similar
                     delivery.email = userProfile.newsletterDelivery.email;
                 }
-                if ((_b = userProfile.newsletterDelivery) === null || _b === void 0 ? void 0 : _b.googleChat) {
+                if ((_c = userProfile.newsletterDelivery) === null || _c === void 0 ? void 0 : _c.googleChat) {
                     // TODO: Implement Google Chat delivery
                     delivery.googleChat = userProfile.newsletterDelivery.googleChat;
                 }

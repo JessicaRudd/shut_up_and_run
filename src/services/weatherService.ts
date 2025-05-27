@@ -4,6 +4,7 @@ import type { DailyForecastData, HourlyWeatherData } from '@/lib/types';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { format, fromUnixTime, startOfDay, parseISO as dateFnsParseISO } from 'date-fns';
 import { WeatherData } from '@/types/weather';
+import { getAuth } from 'firebase/auth';
 
 const CACHE_PREFIX = 'weatherCache_';
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes in milliseconds
@@ -61,22 +62,42 @@ export async function getWeatherByLocation(location: string, unit: 'metric' | 'i
   }
 
   try {
-    // Initialize Firebase Functions
-    const functions = getFunctions();
-    const getWeatherData = httpsCallable<{ location: string; unit: string }, WeatherData>(functions, 'weather-getData');
+    // Get the current user's ID token
+    const auth = getAuth();
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User must be authenticated');
+    }
+    const idToken = await user.getIdToken();
 
-    // Call the Cloud Function
-    const result = await getWeatherData({ location, unit });
+    // Call the HTTP endpoint
+    const response = await fetch(
+      `https://us-central1-shut-up-and-run.cloudfunctions.net/weather-getData?location=${encodeURIComponent(location)}&unit=${unit}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${idToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch weather data');
+    }
+
+    const data = await response.json();
     
     // Only use localStorage for client-side caching if we're in the browser
     if (isClient) {
       safeLocalStorage.setItem(`weather_${location}_${unit}`, JSON.stringify({
-        data: result.data,
+        data,
         timestamp: Date.now(),
       }));
     }
 
-    return result.data;
+    return data;
   } catch (error) {
     console.error('[WeatherService] Error fetching weather data:', error);
     throw error;

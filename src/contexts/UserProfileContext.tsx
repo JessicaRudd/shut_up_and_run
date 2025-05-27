@@ -3,6 +3,8 @@
 import type { UserProfile, RunningLevel, TrainingPlan, WeatherUnit, NewsletterDelivery, NewsSearchCategory, LongRunDay } from "@/lib/types";
 import { DEFAULT_USER_PROFILE, RUNNING_LEVELS, TRAINING_PLANS, WEATHER_UNITS, NEWSLETTER_DELIVERY_OPTIONS, NEWS_SEARCH_CATEGORIES, RUNNING_DAYS_OPTIONS, LONG_RUN_DAY_OPTIONS } from "@/lib/constants";
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+import { useAuth } from "./AuthContext";
+import { userProfileService } from "@/lib/firebase/userProfile";
 
 interface UserProfileContextType {
   userProfile: UserProfile;
@@ -12,29 +14,6 @@ interface UserProfileContextType {
 }
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
-
-const isClient = typeof window !== 'undefined';
-
-// Helper to safely access localStorage
-const safeLocalStorage = {
-  getItem: (key: string): string | null => {
-    if (!isClient) return null;
-    try {
-      return localStorage.getItem(key);
-    } catch (error) {
-      console.warn('[UserProfile] Could not access localStorage:', error);
-      return null;
-    }
-  },
-  setItem: (key: string, value: string): void => {
-    if (!isClient) return;
-    try {
-      localStorage.setItem(key, value);
-    } catch (error) {
-      console.warn('[UserProfile] Could not write to localStorage:', error);
-    }
-  }
-};
 
 // Helper function to validate and normalize user profile data
 const validateUserProfile = (profile: Partial<UserProfile>): UserProfile => {
@@ -59,9 +38,6 @@ const validateUserProfile = (profile: Partial<UserProfile>): UserProfile => {
 // Helper function to check profile completeness
 const checkProfileCompleteness = (profile: UserProfile | null): boolean => {
   if (!profile) return false;
-  // RaceDate is optional. PlanStartDate is also optional but often derived or defaulted.
-  // newsSearchPreferences are optional.
-  // runningDaysPerWeek and longRunDay now have defaults, so they are always "set".
   return !!(
     profile.name &&
     profile.location &&
@@ -69,46 +45,62 @@ const checkProfileCompleteness = (profile: UserProfile | null): boolean => {
     profile.trainingPlan && 
     profile.weatherUnit &&
     profile.newsletterDelivery &&
-    profile.runningDaysPerWeek && // Added check
-    profile.longRunDay // Added check
+    profile.runningDaysPerWeek &&
+    profile.longRunDay
   );
 };
 
 export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
+  const { user } = useAuth();
   const [userProfile, setUserProfile] = useState<UserProfile>(DEFAULT_USER_PROFILE);
   const [loading, setLoading] = useState(true);
   const [isProfileComplete, setIsProfileComplete] = useState(false);
 
   useEffect(() => {
-    let profileToSet = DEFAULT_USER_PROFILE;
-    try {
-      const storedProfileJson = safeLocalStorage.getItem("userProfile");
-      if (storedProfileJson) {
-        const storedProfile = JSON.parse(storedProfileJson) as Partial<UserProfile>;
-        profileToSet = validateUserProfile(storedProfile);
+    const loadProfile = async () => {
+      if (user) {
+        try {
+          const profile = await userProfileService.getUserProfile(user.uid);
+          if (profile) {
+            const validatedProfile = validateUserProfile(profile);
+            setUserProfile(validatedProfile);
+            setIsProfileComplete(checkProfileCompleteness(validatedProfile));
+          } else {
+            setUserProfile(DEFAULT_USER_PROFILE);
+            setIsProfileComplete(false);
+          }
+        } catch (error) {
+          console.error("Error loading user profile:", error);
+          setUserProfile(DEFAULT_USER_PROFILE);
+          setIsProfileComplete(false);
+        }
+      } else {
+        setUserProfile(DEFAULT_USER_PROFILE);
+        setIsProfileComplete(false);
       }
-    } catch (error) {
-      console.error("Failed to load user profile from localStorage", error);
-    }
-    
-    setUserProfile(profileToSet);
-    setIsProfileComplete(checkProfileCompleteness(profileToSet));
-    setLoading(false);
-  }, []);
+      setLoading(false);
+    };
 
-  const setUserProfileState = (profileChanges: Partial<UserProfile>) => {
-    setUserProfile(prevProfile => {
-      const newProfile = { ...prevProfile, ...profileChanges };
+    loadProfile();
+  }, [user]);
+
+  const setUserProfileState = async (profileChanges: Partial<UserProfile>) => {
+    if (!user) return;
+
+    try {
+      const newProfile = { ...userProfile, ...profileChanges };
       const validatedProfile = validateUserProfile(newProfile);
       
-      try {
-        safeLocalStorage.setItem("userProfile", JSON.stringify(validatedProfile));
-      } catch (error) {
-        console.error("Failed to save user profile to localStorage", error);
-      }
+      // Update in Firebase
+      await userProfileService.updateUserProfile(user.uid, validatedProfile);
       
-      return validatedProfile;
-    });
+      // Update local state
+      setUserProfile(validatedProfile);
+      setIsProfileComplete(checkProfileCompleteness(validatedProfile));
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      throw error;
+    }
   };
   
   return (

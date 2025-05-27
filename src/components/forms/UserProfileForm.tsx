@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -52,16 +51,10 @@ const longRunDayValues = LONG_RUN_DAY_OPTIONS.map(d => d.value) as [LongRunDay, 
 const formSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
   location: z.string().min(2, { message: "Location is required." }),
-  runningLevel: z.enum(["beginner", "intermediate", "advanced"], {
-    errorMap: () => ({ message: "Please select a running level." }),
-  }),
-  trainingPlan: z.enum(["5k", "10k", "half-marathon", "marathon", "ultra"], {
-    errorMap: () => ({ message: "Please select a training plan." }),
-  }),
+  runningLevel: z.enum(["beginner", "intermediate", "advanced"]),
+  trainingPlan: z.enum(["5k", "10k", "half-marathon", "marathon", "ultra"]),
   runningDaysPerWeek: z.coerce.number().min(3).max(7, {message: "Please select how many days per week you plan to run."}),
-  longRunDay: z.enum(longRunDayValues, {
-    errorMap: () => ({ message: "Please select your preferred long run day."}),
-  }),
+  longRunDay: z.enum(longRunDayValues),
   planStartDate: z.string().optional(),
   raceDate: z.string().optional(),
   weatherUnit: z.enum(["C", "F"]),
@@ -89,14 +82,14 @@ export function UserProfileForm() {
     defaultValues: {
       name: "",
       location: "",
-      runningLevel: undefined, 
-      trainingPlan: undefined, 
+      runningLevel: "beginner" as RunningLevel,
+      trainingPlan: "5k" as TrainingPlanType,
       runningDaysPerWeek: DEFAULT_USER_PROFILE.runningDaysPerWeek,
       longRunDay: DEFAULT_USER_PROFILE.longRunDay,
       planStartDate: undefined,
       raceDate: undefined,
-      weatherUnit: DEFAULT_USER_PROFILE.weatherUnit,
-      newsletterDelivery: DEFAULT_USER_PROFILE.newsletterDelivery,
+      weatherUnit: "F" as WeatherUnit,
+      newsletterDelivery: "email" as NewsletterDelivery,
       newsSearchPreferences: DEFAULT_USER_PROFILE.newsSearchPreferences || [],
     },
   });

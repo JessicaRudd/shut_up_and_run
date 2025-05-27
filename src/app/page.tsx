@@ -1,4 +1,3 @@
-
 "use client";
 
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -7,11 +6,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Footprints } from "lucide-react";
 import { DashboardContentOrchestrator } from "@/components/dashboard/DashboardContentOrchestrator";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function DashboardPage() {
   const { loading: userProfileLoading, isProfileComplete } = useUserProfile();
+  const { user } = useAuth();
 
   if (userProfileLoading) {
     return (
@@ -28,24 +29,50 @@ export default function DashboardPage() {
     );
   }
 
+  if (!user) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+          <Card className="w-full max-w-md text-center shadow-xl">
+            <CardHeader>
+              <Footprints className="mx-auto h-12 w-12 text-primary" />
+              <CardTitle className="text-2xl mt-4">Welcome to Shut Up and Run!</CardTitle>
+              <CardDescription className="mt-2">
+                Your personalized running companion. Sign up or log in to get started.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Link href="/signup">Create Account</Link>
+              </Button>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/login">Sign In</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
+
   if (!isProfileComplete) {
     return (
       <MainLayout>
         <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
-        <Card className="w-full max-w-md text-center shadow-xl">
-          <CardHeader>
-            <AlertTriangle className="mx-auto h-12 w-12 text-primary" />
-            <CardTitle className="text-2xl mt-4">Welcome to Shut Up and Run!</CardTitle>
-            <CardDescription className="mt-2">
-              To get your personalized running dashboard, please complete your profile with all required fields.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-              <Link href="/profile">Complete Your Profile</Link>
-            </Button>
-          </CardContent>
-        </Card>
+          <Card className="w-full max-w-md text-center shadow-xl">
+            <CardHeader>
+              <AlertTriangle className="mx-auto h-12 w-12 text-primary" />
+              <CardTitle className="text-2xl mt-4">Complete Your Profile</CardTitle>
+              <CardDescription className="mt-2">
+                To get your personalized running dashboard, please complete your profile with all required fields.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Link href="/profile">Complete Your Profile</Link>
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </MainLayout>
     );
@@ -53,7 +80,6 @@ export default function DashboardPage() {
 
   return (
     <MainLayout>
-      {/* userProfile prop is removed as Orchestrator now gets it from context */}
       <DashboardContentOrchestrator />
     </MainLayout>
   );

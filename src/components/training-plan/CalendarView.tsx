@@ -38,7 +38,7 @@ export function CalendarView({ fullPlan, planStartDate }: CalendarViewProps) {
   };
   
   // Ensure selected day highlights properly
-  const dayPickerSelectedModifiers = selectedDate ? { selected: selectedDate } : {};
+  const dayPickerSelectedModifiers = { selected: selectedDate || [] };
   const combinedModifiers = { ...modifiers, ...dayPickerSelectedModifiers };
   const combinedModifiersClassNames = {
     ...modifiersClassNames,
