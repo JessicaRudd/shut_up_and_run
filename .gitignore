@@ -43,3 +43,17 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+.firebase/
+.firebase/**/*
+firebase-frameworks-*/
+firebase-frameworks-*/**
+.firebase/shut-up-and-run/
+.firebase/shut-up-and-run/**/*
+
+# build artifacts
+**/dist/
+**/.next/
+**/node_modules/
+**/build/
+**/*.pack
+**/*.pack.old
